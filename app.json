@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "8c0c586f-4950-4295-9dbe-ab222ec5bbb3"
+      }
+    },
+    "owner": "mads_olsen",
+    "slug": "marvin"
+  }
+}
