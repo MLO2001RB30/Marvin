@@ -5,11 +5,12 @@ import { useAppState } from "../state/AppState";
 import { useTheme } from "../theme/ThemeProvider";
 
 export function MailIntelligenceScreen() {
-  const { mockInputs } = useAppState();
+  const { externalItems } = useAppState();
   const { colors, spacing, typography, radius } = useTheme();
+  const mailThreads = externalItems.filter((item) => item.type === "gmail_thread");
   return (
     <SectionBlock title="Mail Intelligence" rightLabel="Thread triage">
-      {mockInputs.mail.payload.map((thread) => (
+      {mailThreads.map((thread) => (
         <View
           key={thread.id}
           style={{
@@ -22,13 +23,13 @@ export function MailIntelligenceScreen() {
           }}
         >
           <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md }}>
-            {thread.subject}
+            {thread.title}
           </Text>
           <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}>
-            {thread.sender} - {thread.unansweredHours}h unanswered
+            {thread.sender ?? "unknown"} - {thread.requiresReply ? "Needs reply" : "No reply needed"}
           </Text>
           <Text style={{ color: colors.accentGold, fontSize: typography.sizes.sm }}>
-            Importance: {(thread.importanceScore * 100).toFixed(0)}%
+            Importance: {thread.tags.includes("urgent") || thread.tags.includes("high_priority") ? "High" : "Normal"}
           </Text>
         </View>
       ))}

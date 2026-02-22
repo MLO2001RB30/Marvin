@@ -5,8 +5,10 @@ import { useAppState } from "../state/AppState";
 import { useTheme } from "../theme/ThemeProvider";
 
 export function MorningBriefScreen() {
-  const { mockInputs } = useAppState();
+  const { externalItems, workflows } = useAppState();
   const { colors, spacing, typography, radius } = useTheme();
+  const mailCount = externalItems.filter((item) => item.type === "gmail_thread" && item.isOutstanding).length;
+  const workflowCount = workflows.filter((item) => item.enabled).length;
   return (
     <SectionBlock title="Morning Intelligence Brief">
       <View
@@ -20,14 +22,13 @@ export function MorningBriefScreen() {
         }}
       >
         <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md }}>
-          Unanswered priority threads: {mockInputs.mail.payload.length}
+          Unanswered priority threads: {mailCount}
         </Text>
         <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}>
-          Meetings today: {mockInputs.calendar.payload.length}
+          Enabled workflows: {workflowCount}
         </Text>
         <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}>
-          Weather: {mockInputs.weather.payload.condition}, {mockInputs.weather.payload.temperatureC}
-          °C
+          Outstanding items: {externalItems.filter((item) => item.isOutstanding).length}
         </Text>
       </View>
     </SectionBlock>

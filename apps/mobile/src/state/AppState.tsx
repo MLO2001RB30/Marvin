@@ -1,96 +1,343 @@
-import {
-  mockContextInputs,
-  mockExternalItems,
-  mockIntegrationAccounts,
-  mockWorkflowRuns,
-  mockWorkflows,
-  type ExternalItem,
-  type IntegrationAccount,
-  type IntegrationConsent,
-  type IntegrationProvider,
-  type Mode,
-  type WorkflowDefinition,
-  type WorkflowRun
+import type {
+  AssistantChat,
+  AssistantAttachment,
+  AssistantAnswer,
+  AssistantChatMessage,
+  AssistantQueryRequest,
+  DailyBriefJson,
+  DailyContextSnapshot,
+  ExternalItem,
+  IntegrationAccount,
+  IntegrationConsent,
+  IntegrationProvider,
+  Mode,
+  WorkflowDefinition,
+  WorkflowRun
 } from "@pia/shared";
 import {
   createContext,
+  useEffect,
   PropsWithChildren,
   useContext,
+  useCallback,
   useMemo,
+  useRef,
   useState
 } from "react";
+import { AppState as RNAppState, Linking } from "react-native";
 
 import type { RootTabKey } from "../navigation/tabIA";
+import { createApiClient } from "../services/apiClient";
 
 interface AppStateValue {
+  isLoading: boolean;
+  error: string | null;
+  retryLoad: () => Promise<void>;
   activeTab: RootTabKey;
   setActiveTab: (next: RootTabKey) => void;
   mode: Mode;
   setMode: (mode: Mode) => void;
   consents: IntegrationConsent[];
-  upsertConsent: (consent: IntegrationConsent) => void;
+  upsertConsent: (consent: IntegrationConsent) => Promise<void>;
   integrationAccounts: IntegrationAccount[];
-  toggleIntegration: (provider: IntegrationProvider) => void;
+  startIntegrationConnect: (provider: IntegrationProvider) => Promise<string>;
+  disconnectIntegration: (provider: IntegrationProvider) => Promise<void>;
+  refreshIntegrations: () => Promise<void>;
   externalItems: ExternalItem[];
   workflows: WorkflowDefinition[];
-  upsertWorkflow: (workflow: WorkflowDefinition) => void;
+  upsertWorkflow: (workflow: WorkflowDefinition) => Promise<void>;
   workflowRuns: WorkflowRun[];
-  addWorkflowRun: (run: WorkflowRun) => void;
-  mockInputs: typeof mockContextInputs;
+  runWorkflowNow: (workflowId: string) => Promise<void>;
+  latestContext: DailyContextSnapshot | null;
+  dailyBrief: DailyBriefJson | null;
+  runContextPipelineNow: () => Promise<void>;
+  selectedRunDetails: WorkflowRun | null;
+  loadRunDetails: (runId: string) => Promise<void>;
+  assistantAnswer: AssistantAnswer["answer"] | null;
+  assistantReferences: AssistantAnswer["contextReferences"] | null;
+  assistantChats: AssistantChat[];
+  assistantActiveChatId: string | null;
+  assistantSidebarOpen: boolean;
+  setAssistantSidebarOpen: (open: boolean) => void;
+  assistantNavBarHidden: boolean;
+  setAssistantNavBarHidden: (hidden: boolean) => void;
+  assistantComposerCompactByChat: Record<string, boolean>;
+  setAssistantComposerCompact: (chatId: string, compact: boolean) => void;
+  setAssistantActiveChat: (chatId: string) => Promise<void>;
+  startAssistantChat: () => void;
+  assistantMessages: AssistantChatMessage[];
+  assistantSending: boolean;
+  sendAssistantMessage: (payload: AssistantQueryRequest) => Promise<void>;
+  appendAssistantMessages: (messages: AssistantChatMessage[]) => void;
+  refreshAssistantAnswer: () => Promise<void>;
+  userTimezone: string;
+  setUserTimezone: (timezone: string) => Promise<void>;
 }
 
-const initialConsents: IntegrationConsent[] = [
-  {
-    provider: "gmail",
-    enabled: true,
-    scopes: ["threads.read", "threads.metadata"],
-    metadataOnly: true,
-    updatedAtIso: new Date().toISOString()
-  },
-  {
-    provider: "google_calendar",
-    enabled: true,
-    scopes: ["calendar.read"],
-    metadataOnly: true,
-    updatedAtIso: new Date().toISOString()
-  },
-  {
-    provider: "healthkit",
-    enabled: true,
-    scopes: ["sleep.read", "hrv.read", "recovery.read"],
-    metadataOnly: true,
-    updatedAtIso: new Date().toISOString()
-  },
-  {
-    provider: "weatherkit",
-    enabled: true,
-    scopes: ["weather.read"],
-    metadataOnly: true,
-    updatedAtIso: new Date().toISOString()
-  }
+const consentProviders: IntegrationProvider[] = [
+  "slack",
+  "gmail",
+  "google_drive",
+  "onedrive",
+  "dropbox",
+  "google_calendar",
+  "healthkit",
+  "weatherkit"
 ];
 
 const AppStateContext = createContext<AppStateValue | null>(null);
 
-export function AppStateProvider({ children }: PropsWithChildren) {
-  const [activeTab, setActiveTab] = useState<RootTabKey>("home");
+export function AppStateProvider({
+  children,
+  userId,
+  accessToken
+}: PropsWithChildren<{ userId: string; accessToken: string }>) {
+  const api = useMemo(() => createApiClient({ userId, accessToken }), [accessToken, userId]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<RootTabKey>("brief");
   const [mode, setMode] = useState<Mode>("execution");
-  const [consents, setConsents] = useState<IntegrationConsent[]>(initialConsents);
-  const [integrationAccounts, setIntegrationAccounts] = useState<IntegrationAccount[]>(
-    mockIntegrationAccounts
+  const [consents, setConsents] = useState<IntegrationConsent[]>([]);
+  const [integrationAccounts, setIntegrationAccounts] = useState<IntegrationAccount[]>([]);
+  const [externalItems, setExternalItems] = useState<ExternalItem[]>([]);
+  const [workflows, setWorkflows] = useState<WorkflowDefinition[]>([]);
+  const [workflowRuns, setWorkflowRuns] = useState<WorkflowRun[]>([]);
+  const [latestContext, setLatestContext] = useState<DailyContextSnapshot | null>(null);
+  const [dailyBrief, setDailyBrief] = useState<DailyBriefJson | null>(null);
+  const [selectedRunDetails, setSelectedRunDetails] = useState<WorkflowRun | null>(null);
+  const [assistantAnswer, setAssistantAnswer] = useState<AssistantAnswer["answer"] | null>(null);
+  const [assistantReferences, setAssistantReferences] = useState<AssistantAnswer["contextReferences"] | null>(null);
+  const [assistantChats, setAssistantChats] = useState<AssistantChat[]>([]);
+  const [assistantActiveChatId, setAssistantActiveChatId] = useState<string | null>(null);
+  const [assistantSidebarOpen, setAssistantSidebarOpen] = useState(false);
+  const [assistantNavBarHidden, setAssistantNavBarHidden] = useState(false);
+  const [assistantComposerCompactByChat, setAssistantComposerCompactByChat] = useState<
+    Record<string, boolean>
+  >({});
+  const [assistantMessages, setAssistantMessages] = useState<AssistantChatMessage[]>([]);
+  const [assistantSending, setAssistantSending] = useState(false);
+  const [userTimezone, setUserTimezoneState] = useState<string>(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone
   );
-  const [externalItems] = useState<ExternalItem[]>(mockExternalItems);
-  const [workflows, setWorkflows] = useState<WorkflowDefinition[]>(mockWorkflows);
-  const [workflowRuns, setWorkflowRuns] = useState<WorkflowRun[]>(mockWorkflowRuns);
+
+  const loadAll = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [
+        consentsResponse,
+        integrationsResponse,
+        itemsResponse,
+        workflowsResponse,
+        historyResponse,
+        latestContextResponse,
+        dailyBriefResponse,
+        chatsResponse,
+        profileResponse
+      ] =
+        await Promise.all([
+          api.listConsents(),
+          api.listIntegrations(),
+          api.listItems(),
+          api.listWorkflows(),
+          api.listHistory(),
+          api.getLatestContext(),
+          api.getDailyBrief(),
+          api.listAssistantChats(),
+          api.getProfile().catch(() => ({ timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }))
+        ]);
+
+      const byProvider = new Map(consentsResponse.consents.map((item) => [item.provider, item]));
+      const nowIso = new Date().toISOString();
+      setConsents(
+        consentProviders.map(
+          (provider) =>
+            byProvider.get(provider) ?? {
+              provider,
+              enabled: false,
+              scopes: [],
+              metadataOnly: true,
+              updatedAtIso: nowIso
+            }
+        )
+      );
+      setIntegrationAccounts(integrationsResponse.integrations);
+      setExternalItems(itemsResponse.items);
+      setWorkflows(workflowsResponse.workflows);
+      setWorkflowRuns(historyResponse.runs);
+      setLatestContext(latestContextResponse.snapshot);
+      setAssistantChats(chatsResponse.chats);
+      const firstChatId = chatsResponse.chats[0]?.id ?? null;
+      setAssistantActiveChatId(firstChatId);
+      if (firstChatId) {
+        const { messages } = await api.listAssistantChatMessages(firstChatId);
+        setAssistantMessages(messages);
+      } else {
+        setAssistantMessages([]);
+      }
+      setUserTimezoneState(profileResponse.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
+
+      const snapshot = latestContextResponse.snapshot;
+      const staleThresholdMs = 15 * 60 * 1000;
+      const isStale =
+        !snapshot ||
+        Date.now() - new Date(snapshot.generatedAtIso).getTime() > staleThresholdMs;
+      if (isStale) {
+        void (async () => {
+          try {
+            const { snapshot: fresh, dailyBrief: brief } = await api.runContextPipeline();
+            setLatestContext(fresh);
+            if (brief) setDailyBrief(brief);
+            const { runs } = await api.listHistory();
+            setWorkflowRuns(runs);
+            const { integrations } = await api.listIntegrations();
+            setIntegrationAccounts(integrations);
+          } catch {
+            // ignore – user can refresh manually
+          }
+        })();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load app state.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [api]);
+
+  const sendAssistantMessage = useCallback(async (payload: AssistantQueryRequest) => {
+    const question = payload.question.trim();
+    const normalizedQuestion =
+      question.length > 0 ? question : "Please analyze the attached media using my latest context.";
+    const attachments: AssistantAttachment[] = payload.attachments ?? [];
+
+    setAssistantSending(true);
+    try {
+      const { response, chatId, userMessage, assistantMessage } = await api.askAssistant({
+        question: normalizedQuestion,
+        attachments,
+        chatId: assistantActiveChatId ?? undefined,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      });
+      setAssistantAnswer(response.answer);
+      setAssistantReferences(response.contextReferences ?? null);
+      setAssistantActiveChatId(chatId);
+      setAssistantComposerCompactByChat((current) => ({
+        ...current,
+        [chatId]: true
+      }));
+      setAssistantMessages((current) => {
+        const withoutThinking = current.filter((m) => m.id !== "thinking-placeholder");
+        if (assistantActiveChatId && assistantActiveChatId === chatId) {
+          return [...withoutThinking, userMessage, assistantMessage];
+        }
+        return [userMessage, assistantMessage];
+      });
+      const { chats } = await api.listAssistantChats();
+      setAssistantChats(chats);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Assistant request failed.";
+      setError(
+        msg.toLowerCase().includes("aborted")
+          ? "Request timed out. The assistant may be busy—try again in a moment."
+          : msg
+      );
+      setAssistantMessages((current) => current.filter((m) => m.id !== "thinking-placeholder"));
+    } finally {
+      setAssistantSending(false);
+    }
+  }, [api, assistantActiveChatId]);
+
+  const appendAssistantMessages = useCallback((messages: AssistantChatMessage[]) => {
+    setAssistantMessages((current) => [...current, ...messages]);
+  }, []);
+
+  const setUserTimezone = useCallback(
+    async (timezone: string) => {
+      await api.updateProfile({ timezone });
+      setUserTimezoneState(timezone);
+    },
+    [api]
+  );
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  useEffect(() => {
+    const subscription = Linking.addEventListener("url", ({ url }) => {
+      try {
+        const parsed = new URL(url);
+        const isOAuthCallback = parsed.host === "oauth" && parsed.pathname === "/callback";
+        if (isOAuthCallback) {
+          void (async () => {
+            const { integrations } = await api.listIntegrations();
+            setIntegrationAccounts(integrations);
+          })();
+        }
+      } catch {
+        // Ignore malformed deeplink events.
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [api]);
+
+  const lastBackgroundAtRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const sub = RNAppState.addEventListener("change", (nextState) => {
+      if (nextState === "background" || nextState === "inactive") {
+        lastBackgroundAtRef.current = Date.now();
+      }
+      if (nextState === "active") {
+        const inactiveMs = lastBackgroundAtRef.current
+          ? Date.now() - lastBackgroundAtRef.current
+          : 0;
+        const inactiveThresholdMs = 15 * 60 * 1000;
+        if (inactiveMs >= inactiveThresholdMs) {
+          setAssistantActiveChatId(null);
+          setAssistantMessages([]);
+          setAssistantAnswer(null);
+          setAssistantReferences(null);
+        }
+        void (async () => {
+          try {
+            const { snapshot } = await api.getLatestContext();
+            const staleThresholdMs = 15 * 60 * 1000;
+            const isStale =
+              !snapshot ||
+              Date.now() - new Date(snapshot.generatedAtIso).getTime() > staleThresholdMs;
+            if (isStale) {
+              const { snapshot: fresh, dailyBrief: brief } = await api.runContextPipeline();
+              setLatestContext(fresh);
+              if (brief) setDailyBrief(brief);
+              const { runs } = await api.listHistory();
+              setWorkflowRuns(runs);
+              const { integrations } = await api.listIntegrations();
+              setIntegrationAccounts(integrations);
+            }
+          } catch {
+            // ignore
+          }
+        })();
+      }
+    });
+    return () => sub.remove();
+  }, [api]);
 
   const value = useMemo<AppStateValue>(
     () => ({
+      isLoading,
+      error,
+      retryLoad: loadAll,
       activeTab,
       setActiveTab,
       mode,
       setMode,
       consents,
-      upsertConsent: (consent) => {
+      upsertConsent: async (consent) => {
+        await api.upsertConsent(consent);
         setConsents((current) => {
           const index = current.findIndex((item) => item.provider === consent.provider);
           if (index === -1) {
@@ -102,39 +349,128 @@ export function AppStateProvider({ children }: PropsWithChildren) {
         });
       },
       integrationAccounts,
-      toggleIntegration: (provider) => {
-        setIntegrationAccounts((current) =>
-          current.map((account) =>
-            account.provider === provider
-              ? {
-                  ...account,
-                  status: account.status === "connected" ? "disconnected" : "connected",
-                  lastSyncAtIso: new Date().toISOString()
-                }
-              : account
-          )
-        );
+      startIntegrationConnect: async (provider) => {
+        const { authorizationUrl } = await api.startIntegrationOAuth(provider);
+        return authorizationUrl;
+      },
+      disconnectIntegration: async (provider) => {
+        const { integrations } = await api.disconnectIntegration(provider);
+        setIntegrationAccounts(integrations);
+      },
+      refreshIntegrations: async () => {
+        const { integrations } = await api.listIntegrations();
+        setIntegrationAccounts(integrations);
       },
       externalItems,
       workflows,
-      upsertWorkflow: (workflow) => {
+      upsertWorkflow: async (workflow) => {
+        const { workflow: nextWorkflow } = await api.upsertWorkflow(workflow);
         setWorkflows((current) => {
-          const index = current.findIndex((item) => item.id === workflow.id);
+          const index = current.findIndex((item) => item.id === nextWorkflow.id);
           if (index === -1) {
-            return [...current, workflow];
+            return [...current, nextWorkflow];
           }
           const copy = [...current];
-          copy[index] = workflow;
+          copy[index] = nextWorkflow;
           return copy;
         });
       },
       workflowRuns,
-      addWorkflowRun: (run) => {
+      runWorkflowNow: async (workflowId) => {
+        const { run } = await api.runWorkflow(workflowId);
         setWorkflowRuns((current) => [run, ...current]);
+        const { snapshot } = await api.getLatestContext();
+        setLatestContext(snapshot);
       },
-      mockInputs: mockContextInputs
+      latestContext,
+      dailyBrief,
+      runContextPipelineNow: async () => {
+        const { snapshot, dailyBrief: brief } = await api.runContextPipeline();
+        setLatestContext(snapshot);
+        if (brief) setDailyBrief(brief);
+        const [{ runs }, { integrations }, { items }] = await Promise.all([
+          api.listHistory(),
+          api.listIntegrations(),
+          api.listItems()
+        ]);
+        setWorkflowRuns(runs);
+        setIntegrationAccounts(integrations);
+        setExternalItems(items);
+      },
+      selectedRunDetails,
+      loadRunDetails: async (runId) => {
+        const { run } = await api.getRunDetails(runId);
+        setSelectedRunDetails(run);
+      },
+      assistantAnswer,
+      assistantReferences,
+      assistantChats,
+      assistantActiveChatId,
+      assistantSidebarOpen,
+      setAssistantSidebarOpen,
+      assistantNavBarHidden,
+      setAssistantNavBarHidden,
+      assistantComposerCompactByChat,
+      setAssistantComposerCompact: (chatId, compact) => {
+        setAssistantComposerCompactByChat((current) => ({
+          ...current,
+          [chatId]: compact
+        }));
+      },
+      setAssistantActiveChat: async (chatId) => {
+        setAssistantActiveChatId(chatId);
+        const { messages } = await api.listAssistantChatMessages(chatId);
+        setAssistantMessages(messages);
+      },
+      startAssistantChat: () => {
+        setAssistantActiveChatId(null);
+        setAssistantMessages([]);
+        setAssistantAnswer(null);
+        setAssistantReferences(null);
+      },
+      assistantMessages,
+      assistantSending,
+      sendAssistantMessage,
+      appendAssistantMessages,
+      refreshAssistantAnswer: async () => {
+        const { response } = await api.askAssistant({
+          question: "What is blocking me this morning?",
+          chatId: assistantActiveChatId ?? undefined,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        });
+        setAssistantAnswer(response.answer);
+        setAssistantReferences(response.contextReferences ?? null);
+      },
+      userTimezone,
+      setUserTimezone
     }),
-    [activeTab, mode, consents, integrationAccounts, externalItems, workflows, workflowRuns]
+    [
+      isLoading,
+      error,
+      activeTab,
+      mode,
+      consents,
+      integrationAccounts,
+      externalItems,
+      workflows,
+      workflowRuns,
+      latestContext,
+      selectedRunDetails,
+      assistantAnswer,
+      assistantReferences,
+      assistantChats,
+      assistantActiveChatId,
+      assistantSidebarOpen,
+      assistantNavBarHidden,
+      assistantComposerCompactByChat,
+      assistantMessages,
+      assistantSending,
+      sendAssistantMessage,
+      appendAssistantMessages,
+      userTimezone,
+      setUserTimezone,
+      api
+    ]
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

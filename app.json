@@ -1,11 +1,39 @@
 {
   "expo": {
+    "name": "Marvin",
+    "slug": "marvin",
+    "owner": "mads_olsen",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1A1A1C"
+    },
     "extra": {
       "eas": {
         "projectId": "8c0c586f-4950-4295-9dbe-ab222ec5bbb3"
       }
     },
-    "owner": "mads_olsen",
-    "slug": "marvin"
+    "plugins": [
+      ["expo-image-picker", {"photosPermission": "Allow Marvin to upload images into Assistant chat."}],
+      ["expo-speech-recognition", {
+        "microphonePermission": "Allow Marvin to record voice notes for Assistant chat.",
+        "speechRecognitionPermission": "Allow Marvin to transcribe your voice in Assistant chat.",
+        "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+      }],
+      "expo-audio"
+    ],
+    "ios": {
+      "bundleIdentifier": "Marvin.AI.Intelligence",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Allow Marvin to upload images into Assistant chat.",
+        "NSMicrophoneUsageDescription": "Allow Marvin to record voice notes for Assistant chat."
+      }
+    },
+    "android": {
+      "permissions": ["READ_MEDIA_IMAGES", "RECORD_AUDIO"]
+    },
+    "scheme": "marvin"
   }
 }

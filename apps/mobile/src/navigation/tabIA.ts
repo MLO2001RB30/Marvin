@@ -1,24 +1,18 @@
-export type RootTabKey = "home" | "workflows" | "assistant" | "history" | "settings";
+export type RootTabKey = "brief" | "assistant" | "manage";
 
 export interface TabDefinition {
   key: RootTabKey;
   label: string;
-  icon: "home" | "repeat" | "message-circle" | "clock" | "settings";
+  icon: "home" | "message-circle" | "settings";
   surfaces: string[];
 }
 
 export const rootTabs: TabDefinition[] = [
   {
-    key: "home",
-    label: "Home",
+    key: "brief",
+    label: "Brief",
     icon: "home",
-    surfaces: ["Today Brief", "Outstanding Items", "Priority Signals"]
-  },
-  {
-    key: "workflows",
-    label: "Workflows",
-    icon: "repeat",
-    surfaces: ["Scheduled Triggers", "Templates", "Delivery Channels"]
+    surfaces: ["Today Brief", "Urgent", "Important", "Ambient"]
   },
   {
     key: "assistant",
@@ -27,15 +21,9 @@ export const rootTabs: TabDefinition[] = [
     surfaces: ["Ask Questions", "Context Grounding", "Action Suggestions"]
   },
   {
-    key: "history",
-    label: "History",
-    icon: "clock",
-    surfaces: ["Workflow Runs", "Run Logs", "Delivery Outcomes"]
-  },
-  {
-    key: "settings",
-    label: "Settings",
+    key: "manage",
+    label: "Manage",
     icon: "settings",
-    surfaces: ["Integrations", "Notifications", "Privacy"]
+    surfaces: ["Integrations", "Workflows", "History", "Settings"]
   }
 ];

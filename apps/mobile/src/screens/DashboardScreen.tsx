@@ -6,7 +6,7 @@ import { useAppState } from "../state/AppState";
 import { useTheme } from "../theme/ThemeProvider";
 
 export function DashboardScreen() {
-  const { mockInputs } = useAppState();
+  const { workflows, externalItems } = useAppState();
   const { colors, spacing, typography, radius } = useTheme();
   return (
     <View style={{ gap: spacing.md }}>
@@ -30,14 +30,14 @@ export function DashboardScreen() {
           gap: spacing.sm
         }}
       >
-        <Text style={{ color: colors.textPrimary, fontFamily: typography.serif, fontSize: typography.sizes.lg }}>
+        <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.lg }}>
           Unified Dashboard
         </Text>
         <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}>
-          Top focus: {mockInputs.goals.payload[0]}
+          Top focus: {workflows[0]?.name ?? "Create your first workflow"}
         </Text>
         <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.sm }}>
-          This week: 5 of 8 habits completed.
+          Outstanding queue: {externalItems.filter((item) => item.isOutstanding).length} items.
         </Text>
       </View>
     </View>

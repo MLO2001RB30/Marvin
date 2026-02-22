@@ -27,8 +27,7 @@ export function StatCard({
       <Text
         style={{
           color: colors.textPrimary,
-          fontSize: typography.sizes.xxl,
-          fontFamily: typography.serif
+          fontSize: typography.sizes.xxl
         }}
       >
         {value}

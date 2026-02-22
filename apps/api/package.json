@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "tunnel": "\"C:\\Program Files (x86)\\cloudflared\\cloudflared.exe\" tunnel --url http://localhost:4000",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "echo \"No api lint configured\"",
     "test": "echo \"No api tests yet\""
@@ -14,6 +15,7 @@
   "dependencies": {
     "@pia/shared": "0.1.0",
     "@supabase/supabase-js": "^2.49.1",
+    "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "zod": "^3.24.2"
   },

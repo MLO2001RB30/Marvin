@@ -1,32 +1,149 @@
 import express from "express";
 import {
-  mockContextInputs,
   type AssistantQueryRequest,
   type BuildContextRequest,
+  type IntegrationProvider,
   type UpsertConsentRequest,
   type UpsertWorkflowRequest
 } from "@pia/shared";
 
 import { env } from "./config/env";
-import { upsertConsent, logRecommendationAudit } from "./services/auditService";
+import {
+  listConsents,
+  upsertConsent,
+  logAssistantAudit,
+  logPipelineTrace,
+  logRecommendationAudit
+} from "./services/auditService";
 import { answerAssistantQuestion } from "./services/assistantService";
 import { buildContextResult } from "./services/contextEngine";
 import { buildOutstandingDigest } from "./services/digestService";
 import {
-  connectIntegration,
+  completeIntegrationOAuth,
+  disconnectIntegration,
   listExternalItems,
-  listIntegrationAccounts
+  listIntegrationAccounts,
+  startIntegrationOAuth
 } from "./services/integrationService";
+import { syncGmailForUser } from "./services/gmailSyncService";
+import { syncGoogleCalendarForUser } from "./services/googleCalendarSyncService";
+import { syncGoogleDriveForUser } from "./services/googleDriveSyncService";
+import { resolveSlackUserNames, syncSlackForUser } from "./services/slackSyncService";
 import { buildMorningBrief, ingestSignals } from "./services/orchestrationService";
-import { addWorkflowRun, getWorkflowById, listWorkflowRuns, listWorkflows, upsertWorkflow } from "./services/workflowService";
+import {
+  addWorkflowRun,
+  getWorkflowById,
+  getWorkflowRunById,
+  listWorkflowRuns,
+  listWorkflows,
+  upsertWorkflow
+} from "./services/workflowService";
 import { executeWorkflow } from "./services/orchestrationService";
 import { computeProductMetrics } from "./services/metricsService";
+import { getLatestDailyContext, upsertDailyContext } from "./services/contextSnapshotService";
+import { runDailyContextPipeline } from "./services/pipelineService";
+import { runDailyBriefForUser } from "./jobs/dailyBriefJob";
+import { getLatestDailyBrief } from "./services/dailyBriefService";
+import { startScheduler } from "./services/schedulerService";
+import { getSupabaseClient } from "./services/supabaseClient";
+import { transcribeAudioAttachment } from "./services/transcriptionService";
+import { getUserTimezone, upsertUserTimezone } from "./services/userProfileService";
+import {
+  appendAssistantChatMessage,
+  createAssistantChat,
+  listAssistantChatMessages,
+  listAssistantChats
+} from "./services/assistantChatService";
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "20mb" }));
+
+app.use("/v1", async (req, res, next) => {
+  if (req.path.startsWith("/integrations/") && req.path.endsWith("/callback")) {
+    next();
+    return;
+  }
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Missing bearer token" });
+    return;
+  }
+
+  const token = authHeader.slice("Bearer ".length).trim();
+  const client = getSupabaseClient();
+  if (!client) {
+    res.status(500).json({ error: "Supabase API auth is not configured" });
+    return;
+  }
+
+  const { data, error } = await client.auth.getUser(token);
+  if (error || !data.user) {
+    res.status(401).json({ error: "Invalid bearer token" });
+    return;
+  }
+
+  const body = req.body as { userId?: unknown } | undefined;
+  const segments = req.path.split("/").filter(Boolean);
+  let routeUserId: string | null = null;
+  if (
+    [
+      "context",
+      "brief",
+      "integrations",
+      "items",
+      "workflows",
+      "history",
+      "metrics",
+      "digest",
+      "assistant",
+      "profile"
+    ].includes(segments[0] ?? "")
+  ) {
+    routeUserId = segments[1] ?? null;
+  } else if (segments[0] === "privacy" && segments[1] === "consent") {
+    routeUserId = segments[2] ?? null;
+  }
+  if (!routeUserId && typeof body?.userId === "string") {
+    routeUserId = body.userId;
+  }
+
+  if (routeUserId && routeUserId !== data.user.id) {
+    res.status(403).json({ error: "Token user does not match route user" });
+    return;
+  }
+
+  next();
+});
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "pia-api" });
+});
+
+// Google OAuth callback at root (Google requires redirect URI to end in .com)
+app.get("/", async (req, res) => {
+  const code = typeof req.query.code === "string" ? req.query.code : undefined;
+  const state = typeof req.query.state === "string" ? req.query.state : undefined;
+  const error = typeof req.query.error === "string" ? req.query.error : undefined;
+  if (!code && !error) {
+    res.status(200).send("Marvin API");
+    return;
+  }
+  try {
+    const result = await completeIntegrationOAuth({
+      provider: "gmail",
+      state: state ?? "",
+      code,
+      error
+    });
+    if (result.appRedirectUrl) {
+      res.redirect(result.appRedirectUrl);
+      return;
+    }
+    res.json({ ok: result.ok, provider: result.provider, userId: result.userId });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "OAuth callback failed";
+    res.status(400).send(`OAuth failed: ${message}`);
+  }
 });
 
 app.get("/v1/context/:userId", async (req, res) => {
@@ -39,10 +156,41 @@ app.get("/v1/context/:userId", async (req, res) => {
 
 app.post("/v1/context/build", async (req, res) => {
   const payload = req.body as BuildContextRequest;
-  const inputs = payload.inputs ?? mockContextInputs;
+  const inputs = payload.inputs ?? (await ingestSignals(payload.userId));
   const result = buildContextResult(inputs);
   await logRecommendationAudit(payload.userId, result);
   res.json({ result });
+});
+
+app.get("/v1/context/:userId/latest", async (req, res) => {
+  const snapshot = await getLatestDailyContext(req.params.userId);
+  res.json({ snapshot });
+});
+
+app.post("/v1/context/:userId/pipeline/run", async (req, res) => {
+  const { snapshot, traces } = await runDailyContextPipeline(req.params.userId);
+  await logPipelineTrace(req.params.userId, traces, snapshot.id);
+  let dailyBrief = null;
+  try {
+    dailyBrief = await runDailyBriefForUser(req.params.userId);
+  } catch (err) {
+    console.warn("[pipeline] Daily brief job failed:", err);
+  }
+  res.json({ snapshot, traces, dailyBrief });
+});
+
+app.get("/v1/brief/:userId/daily", async (req, res) => {
+  const result = await getLatestDailyBrief(req.params.userId);
+  if (!result) {
+    res.json({ dailyBrief: null });
+    return;
+  }
+  res.json({
+    dailyBrief: result.brief,
+    date: result.date,
+    modelVersion: result.modelVersion,
+    createdAt: result.createdAt
+  });
 });
 
 app.get("/v1/brief/:userId", async (req, res) => {
@@ -56,54 +204,192 @@ app.post("/v1/privacy/consent", async (req, res) => {
   res.json({ success: true });
 });
 
+app.get("/v1/privacy/consent/:userId", async (req, res) => {
+  const consents = await listConsents(req.params.userId);
+  res.json({ consents });
+});
+
 app.get("/v1/integrations/:userId", async (req, res) => {
   const integrations = await listIntegrationAccounts(req.params.userId);
   res.json({ integrations });
 });
 
-app.post("/v1/integrations/:userId/connect/:provider", async (req, res) => {
-  const userId = req.params.userId;
-  const provider = req.params.provider as UpsertConsentRequest["consent"]["provider"];
-  const integrations = await connectIntegration(userId, provider);
-  res.json({ integrations });
+app.post("/v1/integrations/:userId/:provider/start", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const provider = req.params.provider as IntegrationProvider;
+    const start = await startIntegrationOAuth(userId, provider);
+    res.json(start);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to start OAuth";
+    res.status(400).json({ error: message });
+  }
 });
+
+app.get("/v1/integrations/:provider/callback", async (req, res) => {
+  try {
+    const provider = req.params.provider;
+    const state = String(req.query.state ?? "");
+    const code = typeof req.query.code === "string" ? req.query.code : undefined;
+    const oauthError = typeof req.query.error === "string" ? req.query.error : undefined;
+    const result = await completeIntegrationOAuth({
+      provider,
+      state,
+      code,
+      error: oauthError
+    });
+    if (result.appRedirectUrl) {
+      res.redirect(result.appRedirectUrl);
+      return;
+    }
+    res.json({ ok: result.ok, provider: result.provider, userId: result.userId });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "OAuth callback failed";
+    res.status(400).json({ error: message });
+  }
+});
+
+app.post("/v1/integrations/:userId/:provider/disconnect", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const provider = req.params.provider as IntegrationProvider;
+    const integrations = await disconnectIntegration(userId, provider);
+    res.json({ integrations });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to disconnect integration";
+    res.status(400).json({ error: message });
+  }
+});
+
+app.post("/v1/integrations/:userId/slack/sync", async (req, res) => {
+  try {
+    const synced = await syncSlackForUser(req.params.userId);
+    res.json({ synced });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Slack sync failed";
+    res.status(400).json({ error: message });
+  }
+});
+
+app.post("/v1/integrations/:userId/gmail/sync", async (req, res) => {
+  try {
+    const synced = await syncGmailForUser(req.params.userId);
+    res.json({ synced });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Gmail sync failed";
+    res.status(400).json({ error: message });
+  }
+});
+
+app.post("/v1/integrations/:userId/google_drive/sync", async (req, res) => {
+  try {
+    const synced = await syncGoogleDriveForUser(req.params.userId);
+    res.json({ synced });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Google Drive sync failed";
+    res.status(400).json({ error: message });
+  }
+});
+
+app.post("/v1/integrations/:userId/google_calendar/sync", async (req, res) => {
+  try {
+    const synced = await syncGoogleCalendarForUser(req.params.userId);
+    res.json({ synced });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Google Calendar sync failed";
+    res.status(400).json({ error: message });
+  }
+});
+
+const SLACK_ID_REGEX = /^[UW][A-Z0-9]{8,}$/i;
+const SLACK_MENTION_REGEX = /<@([UW][A-Z0-9]{8,})>|@([UW][A-Z0-9]{8,})\b/gi;
+
+function replaceSlackIdsInText(text: string, nameMap: Map<string, string>): string {
+  if (!text || nameMap.size === 0) return text;
+  let result = text;
+  for (const [id, name] of nameMap) {
+    result = result
+      .replace(new RegExp(`<@${id}>`, "g"), `@${name}`)
+      .replace(new RegExp(`@${id}\\b`, "g"), `@${name}`);
+  }
+  return result;
+}
 
 app.get("/v1/items/:userId", async (req, res) => {
   const items = await listExternalItems(req.params.userId);
-  res.json({ items });
+  const slackIds = new Set<string>();
+  for (const item of items) {
+    if (item.provider === "slack" && item.sender && SLACK_ID_REGEX.test(item.sender)) {
+      slackIds.add(item.sender);
+    }
+    const text = `${item.title} ${item.summary}`;
+    const matches = text.matchAll(SLACK_MENTION_REGEX);
+    for (const m of matches) {
+      const id = m[1] || m[2];
+      if (id) slackIds.add(id);
+    }
+  }
+  const nameMap =
+    slackIds.size > 0 ? await resolveSlackUserNames(req.params.userId, [...slackIds]) : new Map();
+  const enriched = items.map((item) => {
+    if (item.provider !== "slack") return item;
+    const senderResolved =
+      item.sender && nameMap.has(item.sender) ? nameMap.get(item.sender) : item.sender;
+    const titleResolved = replaceSlackIdsInText(item.title, nameMap);
+    const summaryResolved = replaceSlackIdsInText(item.summary, nameMap);
+    return { ...item, sender: senderResolved, title: titleResolved, summary: summaryResolved };
+  });
+  res.json({ items: enriched });
 });
 
-app.get("/v1/workflows/:userId", (req, res) => {
-  const workflows = listWorkflows(req.params.userId);
+app.get("/v1/workflows/:userId", async (req, res) => {
+  const workflows = await listWorkflows(req.params.userId);
   res.json({ workflows });
 });
 
-app.post("/v1/workflows/:userId", (req, res) => {
+app.post("/v1/workflows/:userId", async (req, res) => {
   const payload = req.body as UpsertWorkflowRequest;
-  const workflow = upsertWorkflow(req.params.userId, payload.workflow);
+  const workflow = await upsertWorkflow(req.params.userId, payload.workflow);
   res.json({ workflow });
 });
 
 app.post("/v1/workflows/:userId/:workflowId/run", async (req, res) => {
   const { userId, workflowId } = req.params;
-  const workflow = getWorkflowById(userId, workflowId);
+  const workflow = await getWorkflowById(userId, workflowId);
   if (!workflow) {
     res.status(404).json({ error: "Workflow not found" });
     return;
   }
   const run = await executeWorkflow(userId, workflow);
-  addWorkflowRun(userId, run);
+  const snapshot = await getLatestDailyContext(userId);
+  if (snapshot) {
+    run.contextSnapshotId = snapshot.id;
+  }
+  await addWorkflowRun(userId, run);
+  if (snapshot && run.artifactRefs) {
+    await upsertDailyContext({
+      ...snapshot,
+      generatedAtIso: new Date().toISOString(),
+      workflowArtifactRefs: [...snapshot.workflowArtifactRefs, ...run.artifactRefs]
+    });
+  }
   res.json({ run });
 });
 
-app.get("/v1/history/:userId", (req, res) => {
-  const runs = listWorkflowRuns(req.params.userId);
+app.get("/v1/history/:userId", async (req, res) => {
+  const runs = await listWorkflowRuns(req.params.userId);
   res.json({ runs });
 });
 
-app.get("/v1/metrics/:userId", (req, res) => {
-  const runs = listWorkflowRuns(req.params.userId);
-  const metrics = computeProductMetrics(runs);
+app.get("/v1/history/:userId/:runId", async (req, res) => {
+  const run = await getWorkflowRunById(req.params.userId, req.params.runId);
+  res.json({ run });
+});
+
+app.get("/v1/metrics/:userId", async (req, res) => {
+  const runs = await listWorkflowRuns(req.params.userId);
+  const snapshot = await getLatestDailyContext(req.params.userId);
+  const metrics = computeProductMetrics(runs, snapshot);
   res.json({ metrics });
 });
 
@@ -115,13 +401,130 @@ app.get("/v1/digest/:userId", async (req, res) => {
 
 app.post("/v1/assistant/:userId/query", async (req, res) => {
   const payload = req.body as AssistantQueryRequest;
-  const items = await listExternalItems(req.params.userId);
-  const digest = buildOutstandingDigest(items);
-  const response = answerAssistantQuestion(payload.question, digest);
-  res.json({ response });
+  const chat =
+    payload.chatId
+      ? { id: payload.chatId }
+      : await createAssistantChat(req.params.userId, payload.question);
+  const runs = await listWorkflowRuns(req.params.userId);
+  let snapshot = await getLatestDailyContext(req.params.userId);
+  if (!snapshot) {
+    try {
+      const { snapshot: fresh } = await runDailyContextPipeline(req.params.userId);
+      snapshot = fresh;
+      await logPipelineTrace(req.params.userId, ["assistant.on-demand-pipeline"], snapshot.id);
+    } catch (err) {
+      console.warn("[assistant] On-demand pipeline failed:", err);
+    }
+  }
+  const attachments = payload.attachments ?? [];
+  const audioTranscript = await transcribeAudioAttachment(attachments);
+  let externalItems = await listExternalItems(req.params.userId);
+
+  const calendarKeywords =
+    /(meeting|meetings|calendar|schedule|free|busy|appointment|event|day|today|scheduled)/i;
+  const isCalendarQuestion =
+    calendarKeywords.test(payload.question) ||
+    /what'?s?\s+(my\s+)?(day|today)/i.test(payload.question) ||
+    /(do\s+i\s+have|what\s+do\s+i\s+have)\s+(any\s+)?(meetings?|events?|appointments?|today|scheduled)/i.test(
+      payload.question
+    );
+  if (isCalendarQuestion) {
+    try {
+      await syncGoogleCalendarForUser(req.params.userId);
+      externalItems = await listExternalItems(req.params.userId);
+    } catch (err) {
+      console.warn("[assistant] On-demand calendar sync failed:", err);
+    }
+  }
+  const slackUserIds = new Set<string>();
+  for (const item of externalItems) {
+    if (item.sender) slackUserIds.add(item.sender);
+    const text = `${item.title} ${item.summary}`;
+    const matches = text.matchAll(SLACK_MENTION_REGEX);
+    for (const m of matches) slackUserIds.add(m[1] || m[2] || "");
+  }
+  const slackUserNames = await resolveSlackUserNames(req.params.userId, [...slackUserIds]);
+
+  if (payload.timezone?.trim()) {
+    void upsertUserTimezone(req.params.userId, payload.timezone.trim());
+  }
+
+  const chatHistory =
+    chat.id && payload.chatId
+      ? (await listAssistantChatMessages(req.params.userId, chat.id)).slice(-10)
+      : [];
+
+  const userMessage = await appendAssistantChatMessage({
+    userId: req.params.userId,
+    chatId: chat.id,
+    role: "user",
+    text: payload.question,
+    attachments
+  });
+
+  const response = await answerAssistantQuestion(
+    req.params.userId,
+    payload.question,
+    snapshot,
+    runs,
+    attachments,
+    audioTranscript,
+    externalItems,
+    slackUserNames,
+    chatHistory,
+    payload.timezone
+  );
+  const assistantMessage = await appendAssistantChatMessage({
+    userId: req.params.userId,
+    chatId: chat.id,
+    role: "assistant",
+    text: response.answer,
+    attachments: response.attachmentsUsed ?? [],
+    contextReferences: response.contextReferences ?? []
+  });
+  await logAssistantAudit(req.params.userId, payload.question, response, snapshot?.id ?? null);
+  res.json({
+    response,
+    chatId: chat.id,
+    userMessage,
+    assistantMessage
+  });
+});
+
+app.get("/v1/profile/:userId", async (req, res) => {
+  const timezone = await getUserTimezone(req.params.userId);
+  res.json({ timezone });
+});
+
+app.patch("/v1/profile/:userId", async (req, res) => {
+  const { timezone } = req.body as { timezone?: string };
+  if (typeof timezone !== "string") {
+    res.status(400).json({ error: "timezone must be a string (e.g. Europe/Copenhagen)" });
+    return;
+  }
+  const ok = await upsertUserTimezone(req.params.userId, timezone);
+  if (!ok) {
+    res.status(400).json({ error: "Invalid timezone. Use IANA format (e.g. Europe/Copenhagen)" });
+    return;
+  }
+  res.json({ timezone });
+});
+
+app.get("/v1/assistant/:userId/chats", async (req, res) => {
+  const chats = await listAssistantChats(req.params.userId);
+  res.json({ chats });
+});
+
+app.get("/v1/assistant/:userId/chats/:chatId/messages", async (req, res) => {
+  const { userId, chatId } = req.params;
+  const messages = await listAssistantChatMessages(userId, chatId);
+  res.json({ chatId, messages });
 });
 
 app.listen(env.PORT, () => {
-  // Keep startup logging simple for local development.
+  startScheduler();
   console.log(`PIA API listening on port ${env.PORT}`);
+  if (!env.OPENAI_API_KEY) {
+    console.warn("OPENAI_API_KEY not set – assistant will use template answers. Add it to apps/api/.env");
+  }
 });

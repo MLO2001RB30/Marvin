@@ -24,7 +24,7 @@ export function MetricCard({
         gap: spacing.xs
       }}
     >
-      <Text style={{ color: colors.textPrimary, fontFamily: typography.serif, fontSize: typography.sizes.xxl }}>
+      <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.xxl }}>
         {value}
       </Text>
       <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}>{label}</Text>

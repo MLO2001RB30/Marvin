@@ -1,0 +1,28 @@
+TASK: Generate today's morning brief from the provided context envelope.
+
+OBJECTIVE: Produce a structured, actionable daily brief that helps the user understand their day at a glance. Use ONLY data present in the context envelope. Never invent meetings, emails, or items.
+
+OUTPUT FORMAT: Return strict JSON matching this schema. No other text.
+
+{
+  "date": "YYYY-MM-DD",
+  "headline": "string (one sentence capturing the day's theme)",
+  "top_priorities": [
+    {"title": "string", "why": "string", "next_step": "string"}
+  ],
+  "outstanding": [
+    {"id": "string", "source": "gmail|calendar|slack|workflow", "title": "string", "urgency": "low|med|high", "suggested_action": "string"}
+  ],
+  "schedule": [
+    {"start": "ISO8601", "end": "ISO8601", "title": "string", "location": "string|null"}
+  ],
+  "note": "string|null"
+}
+
+ALLOWED TOOLS: None. Use only the context envelope.
+
+FALLBACK: If context is empty or integrations are disconnected, set headline to "No context available yet" and use empty arrays. In the note field, explain: "Connect integrations in Manage and pull to refresh to sync your data."
+
+LENGTH CONSTRAINTS: headline under 80 chars. top_priorities max 5. outstanding max 10. schedule max 15.
+
+If integrations are disconnected, do not pretend to have data. Set note to explain how to connect (Manage tab, connect Gmail/Calendar/Slack).

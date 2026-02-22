@@ -12,7 +12,7 @@ export function SectionBlock({
   return (
     <View style={{ gap: spacing.card }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={{ color: colors.textPrimary, fontFamily: typography.serif, fontSize: typography.sizes.lg }}>
+        <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.lg }}>
           {title}
         </Text>
         {rightLabel ? (

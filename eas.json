@@ -1,0 +1,31 @@
+{
+  "cli": {
+    "version": ">= 18.0.3",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "__SET_IN_EAS_ENV_OR_LOCAL_ENV__",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "__SET_IN_EAS_ENV_OR_LOCAL_ENV__",
+        "EXPO_PUBLIC_API_URL": "http://localhost:4000"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "__SET_IN_EAS_ENV_OR_LOCAL_ENV__",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "__SET_IN_EAS_ENV_OR_LOCAL_ENV__",
+        "EXPO_PUBLIC_API_URL": "http://localhost:4000"
+      }
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

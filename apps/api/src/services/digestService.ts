@@ -7,7 +7,12 @@ import type {
 
 function scoreOutstanding(item: ExternalItem): number {
   let score = 35;
-  if (item.provider === "slack" || item.provider === "gmail") {
+  if (
+    item.provider === "slack" ||
+    item.provider === "gmail" ||
+    item.provider === "google_drive" ||
+    item.provider === "google_calendar"
+  ) {
     score += 20;
   }
   if (item.requiresReply) {

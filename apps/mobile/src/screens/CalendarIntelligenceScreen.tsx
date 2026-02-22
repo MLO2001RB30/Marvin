@@ -5,13 +5,13 @@ import { useAppState } from "../state/AppState";
 import { useTheme } from "../theme/ThemeProvider";
 
 export function CalendarIntelligenceScreen() {
-  const { mockInputs } = useAppState();
+  const { workflows } = useAppState();
   const { colors, spacing, typography, radius } = useTheme();
   return (
     <SectionBlock title="Calendar Intelligence" rightLabel="Energy-aware plan">
-      {mockInputs.calendar.payload.map((event) => (
+      {workflows.map((workflow) => (
         <View
-          key={event.id}
+          key={workflow.id}
           style={{
             borderWidth: 1,
             borderColor: colors.border,
@@ -22,13 +22,14 @@ export function CalendarIntelligenceScreen() {
           }}
         >
           <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md }}>
-            {event.title}
+            {workflow.name}
           </Text>
           <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}>
-            {new Date(event.startIso).toLocaleTimeString()} - {new Date(event.endIso).toLocaleTimeString()}
+            {workflow.trigger.schedule.cadence} at {workflow.trigger.schedule.timeLocal} (
+            {workflow.trigger.schedule.timezone})
           </Text>
           <Text style={{ color: colors.accentGold, fontSize: typography.sizes.sm }}>
-            Energy intensity: {event.intensity}
+            Sources: {workflow.selectedProviders.join(", ")}
           </Text>
         </View>
       ))}

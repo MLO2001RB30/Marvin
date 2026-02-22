@@ -16,6 +16,18 @@ export type IntegrationHealthStatus =
   | "token_expired"
   | "sync_lagging";
 
+export type IntegrationProviderCategory = "communication" | "storage" | "calendar" | "health" | "context";
+
+export interface IntegrationProviderMetadata {
+  provider: IntegrationProvider;
+  displayName: string;
+  category: IntegrationProviderCategory;
+  logoUri: string;
+  defaultScopes: string[];
+  docsUrl?: string;
+  oauthProviderGroup?: "google" | "slack" | "microsoft" | "dropbox";
+}
+
 export interface IntegrationConsent {
   provider: IntegrationProvider;
   enabled: boolean;
@@ -36,6 +48,7 @@ export type ExternalItemType =
   | "slack_message"
   | "gmail_thread"
   | "drive_file"
+  | "calendar_event"
   | "onedrive_file"
   | "dropbox_file";
 
@@ -99,6 +112,19 @@ export interface OutstandingItem {
   explainWhy: string;
 }
 
+export type CommitmentDirection = "user_made" | "others_made";
+
+export interface Commitment {
+  id: string;
+  sourceItemId: string;
+  provider: IntegrationProvider;
+  direction: CommitmentDirection;
+  brief: string;
+  counterparty?: string;
+  dueDateIso?: string;
+  sourceRef: string;
+}
+
 export interface DigestResult {
   generatedAtIso: string;
   summary: string;
@@ -115,13 +141,100 @@ export interface WorkflowRun {
   deliveredChannels: Array<"in_app" | "slack_dm" | "email">;
   digest?: DigestResult;
   errorMessage?: string;
+  integrationsUsed?: IntegrationProvider[];
+  stageResults?: WorkflowStageResult[];
+  artifactRefs?: WorkflowArtifactReference[];
+  contextSnapshotId?: string;
+}
+
+export interface WorkflowStageResult {
+  stage: "ingest" | "score" | "summarize" | "deliver";
+  status: "success" | "failed";
+  startedAtIso: string;
+  finishedAtIso: string;
+  message: string;
+}
+
+export interface WorkflowArtifactReference {
+  artifactId: string;
+  artifactType: "digest" | "insight" | "notification";
+  workflowRunId: string;
+}
+
+export interface ContextSourceStatus {
+  provider: IntegrationProvider;
+  health: IntegrationHealthStatus;
+  itemCount: number;
+  lastSyncAtIso: string;
+}
+
+export interface DailyContextSnapshot {
+  id: string;
+  userId: string;
+  dateIso: string;
+  generatedAtIso: string;
+  summary: string;
+  confidence: number;
+  outstandingItems: OutstandingItem[];
+  topBlockers: string[];
+  whatChanged: string[];
+  digest: DigestResult;
+  sourceStatuses: ContextSourceStatus[];
+  workflowArtifactRefs: WorkflowArtifactReference[];
+  llmModel: string;
+  fallbackUsed: boolean;
+  commitments?: Commitment[];
+}
+
+export interface AssistantContextReference {
+  snapshotId: string;
+  workflowRunId?: string;
+  itemId?: string;
+}
+
+export interface AssistantAttachment {
+  type: "image" | "audio";
+  uri: string;
+  mimeType?: string;
+  fileName?: string;
+  sizeBytes?: number;
+  durationMs?: number;
+  base64?: string;
+}
+
+export interface RecommendedAction {
+  label: string;
+  action_type: "open_thread" | "draft_reply" | "run_workflow" | "open_calendar" | "none";
+  payload?: Record<string, unknown>;
 }
 
 export interface AssistantAnswer {
   question: string;
   answer: string;
   citedItems: Array<{ itemId: string; provider: IntegrationProvider; reason: string }>;
+  contextReferences?: AssistantContextReference[];
+  recommendedActions?: RecommendedAction[];
+  attachmentsUsed?: AssistantAttachment[];
+  audioTranscript?: string;
   generatedAtIso: string;
+}
+
+export interface AssistantChatMessage {
+  id: string;
+  chatId: string;
+  role: "user" | "assistant";
+  text: string;
+  createdAtIso: string;
+  attachments?: AssistantAttachment[];
+  contextReferences?: AssistantContextReference[];
+}
+
+export interface AssistantChat {
+  id: string;
+  title: string;
+  createdAtIso: string;
+  updatedAtIso: string;
+  lastMessageAtIso: string;
 }
 
 export interface SignalEnvelope<TPayload> {
@@ -202,4 +315,59 @@ export interface MorningBrief {
   readiness: string;
   topPriorities: string[];
   suggestedActions: Recommendation[];
+}
+
+export interface DailyBriefJson {
+  date: string;
+  headline: string;
+  top_priorities: Array<{ title: string; why: string; next_step: string }>;
+  outstanding: Array<{
+    id: string;
+    source: string;
+    title: string;
+    urgency: string;
+    suggested_action: string;
+  }>;
+  schedule: Array<{
+    start: string;
+    end: string;
+    title: string;
+    location: string | null;
+  }>;
+  note: string | null;
+}
+
+export interface ContextEnvelope {
+  metadata: {
+    user_id: string;
+    timezone: string;
+    locale: string;
+    now_iso: string;
+  };
+  integrations: Array<{
+    provider: string;
+    connected: boolean;
+    last_sync_at?: string;
+  }>;
+  daily_brief?: {
+    headline: string;
+    top_priorities: Array<{ title: string; why: string; next_step: string }>;
+  };
+  outstanding_items: Array<{
+    id: string;
+    provider: string;
+    title: string;
+    urgency: string;
+  }>;
+  calendar_today: Array<{
+    start: string;
+    end: string;
+    title: string;
+  }>;
+  workflow_runs_recent: Array<{
+    id: string;
+    workflow_id: string;
+    status: string;
+  }>;
+  truncation_notes?: string;
 }

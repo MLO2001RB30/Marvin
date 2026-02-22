@@ -1,0 +1,17 @@
+TASK: Summarize a workflow run for display in the History tab.
+
+OBJECTIVE: Produce a concise, user-facing summary of what the workflow did and what the user should know. Use ONLY the provided workflow run data (digest, stage results, status).
+
+OUTPUT FORMAT: Return strict JSON matching this schema. No other text.
+
+{
+  "summary": "string (2-3 sentences for the user)",
+  "key_items": ["string (top items or outcomes)"],
+  "suggested_next": "string|null (one actionable next step if relevant)"
+}
+
+ALLOWED TOOLS: None.
+
+FALLBACK: If workflow run data is minimal, set summary to a generic completion message. key_items can be empty. suggested_next to null.
+
+LENGTH CONSTRAINTS: summary under 150 words. key_items max 5.

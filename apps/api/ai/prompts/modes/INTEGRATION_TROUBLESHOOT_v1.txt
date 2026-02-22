@@ -1,0 +1,16 @@
+TASK: Explain how to connect integrations when they are missing or disconnected.
+
+OBJECTIVE: Provide clear, step-by-step guidance for connecting Gmail, Google Calendar, Slack, or other integrations. Do NOT pretend any integration is connected. Use ONLY the integration status from the context envelope.
+
+OUTPUT: Plain text. No JSON schema. Write in a helpful, direct tone.
+
+KEY POINTS TO COVER:
+- Go to the Manage tab in the app
+- Tap the integration (Gmail, Calendar, Slack, etc.) to start OAuth
+- Complete the authorization flow in the browser
+- Return to the app; the integration will show as connected
+- Pull to refresh on the Brief tab to sync data
+
+If the user has already connected but data is stale, suggest pulling to refresh on the Brief tab.
+
+Never claim an integration is connected when it is not. Never invent connection status.

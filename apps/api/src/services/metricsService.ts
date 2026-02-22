@@ -1,19 +1,30 @@
-import type { WorkflowRun } from "@pia/shared";
+import type { DailyContextSnapshot, WorkflowRun } from "@pia/shared";
 
 export interface ProductMetrics {
   dailyBriefingOpenRate: number;
   sameDayActionRate: number;
   falsePositiveUrgentRate: number;
   timeToFirstValueMinutes: number;
+  snapshotFreshnessMinutes: number | null;
+  workflowSuccessRate: number;
+  assistantGroundedResponseRate: number;
 }
 
-export function computeProductMetrics(runs: WorkflowRun[]): ProductMetrics {
+export function computeProductMetrics(
+  runs: WorkflowRun[],
+  snapshot: DailyContextSnapshot | null
+): ProductMetrics {
   if (runs.length === 0) {
     return {
       dailyBriefingOpenRate: 0,
       sameDayActionRate: 0,
       falsePositiveUrgentRate: 0,
-      timeToFirstValueMinutes: 0
+      timeToFirstValueMinutes: 0,
+      snapshotFreshnessMinutes: snapshot
+        ? Math.max(0, Math.round((Date.now() - new Date(snapshot.generatedAtIso).getTime()) / 60000))
+        : null,
+      workflowSuccessRate: 0,
+      assistantGroundedResponseRate: snapshot ? 1 : 0
     };
   }
 
@@ -33,6 +44,11 @@ export function computeProductMetrics(runs: WorkflowRun[]): ProductMetrics {
     dailyBriefingOpenRate: Number(openRate.toFixed(2)),
     sameDayActionRate: Number(actionRate.toFixed(2)),
     falsePositiveUrgentRate: Number(falsePositiveRate.toFixed(2)),
-    timeToFirstValueMinutes
+    timeToFirstValueMinutes,
+    snapshotFreshnessMinutes: snapshot
+      ? Math.max(0, Math.round((Date.now() - new Date(snapshot.generatedAtIso).getTime()) / 60000))
+      : null,
+    workflowSuccessRate: Number((successful.length / runs.length).toFixed(2)),
+    assistantGroundedResponseRate: snapshot ? 1 : 0
   };
 }

@@ -8,8 +8,7 @@ export function SectionTitle({ title }: { title: string }) {
     <Text
       style={{
         color: colors.textPrimary,
-        fontSize: typography.sizes.lg,
-        fontFamily: typography.serif
+        fontSize: typography.sizes.lg
       }}
     >
       {title}

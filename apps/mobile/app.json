@@ -1,17 +1,41 @@
 {
   "expo": {
-    "name": "Personal Intelligence",
-    "slug": "personal-intelligence",
+    "name": "Marvin",
+    "slug": "marvin",
     "version": "0.1.0",
     "orientation": "portrait",
-    "platforms": [
-      "ios",
-      "android",
-      "web"
+    "platforms": ["ios", "android", "web"],
+    "icon": "./assets/images/Marvin_logo.png",
+    "splash": {
+      "image": "./assets/images/Marvin_logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "plugins": [
+      ["expo-image-picker", {"photosPermission": "Allow Marvin to upload images into Assistant chat."}],
+      ["expo-speech-recognition", {
+        "microphonePermission": "Allow Marvin to record voice notes for Assistant chat.",
+        "speechRecognitionPermission": "Allow Marvin to transcribe your voice in Assistant chat.",
+        "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+      }],
+      "expo-audio",
+      "expo-sqlite"
     ],
+    "ios": {
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Allow Marvin to upload images into Assistant chat.",
+        "NSMicrophoneUsageDescription": "Allow Marvin to record voice notes for Assistant chat."
+      }
+    },
+    "android": {
+      "permissions": ["READ_MEDIA_IMAGES", "RECORD_AUDIO"],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/Marvin_logo.png",
+        "backgroundColor": "#000000"
+      }
+    },
     "userInterfaceStyle": "dark",
-    "assetBundlePatterns": [
-      "**/*"
-    ]
+    "assetBundlePatterns": ["**/*"],
+    "scheme": "marvin"
   }
 }
