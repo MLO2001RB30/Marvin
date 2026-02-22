@@ -1,4 +1,5 @@
-# Personal Intelligence App (MVP)
+# Marvin
+AI Personal Intelligence
 
 Implementation aligned to the PRD and Elegant Luxury design direction:
 
