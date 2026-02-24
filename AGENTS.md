@@ -24,6 +24,21 @@ Marvin is an AI Personal Intelligence App (npm workspaces monorepo):
 - Expo `--non-interactive` flag is not supported; use `CI=1` environment variable instead if needed.
 - The package manager is **npm** (lockfile: `package-lock.json`). Do not use pnpm or yarn.
 
+### Testing authenticated API endpoints
+
+To test `/v1/*` endpoints, obtain a bearer token via Supabase auth:
+```
+curl -X POST "${SUPABASE_URL}/auth/v1/token?grant_type=password" \
+  -H "apikey: ${EXPO_PUBLIC_SUPABASE_ANON_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"<user-email>","password":"<password>"}'
+```
+Use the `access_token` from the response as `Authorization: Bearer <token>`. The `user.id` field must match the `:userId` param in API routes.
+
+### dotenv behavior
+
+The API loads `apps/api/.env` via dotenv, which does **not** override existing environment variables by default. When secrets are injected into the environment (e.g. via Cursor Cloud secrets), dotenv only fills in vars not already set. This is correct behavior — no need to override.
+
 ### Lint / typecheck / test
 
 Standard commands from `README.md`:
