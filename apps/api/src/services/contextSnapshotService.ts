@@ -1,7 +1,5 @@
 import {
-  type DailyContextSnapshot,
-  type WorkflowArtifactReference,
-  type WorkflowRun
+  type DailyContextSnapshot
 } from "@pia/shared";
 
 import { getSupabaseClient } from "./supabaseClient";
@@ -74,56 +72,6 @@ export async function getLatestDailyContext(userId: string): Promise<DailyContex
   };
 }
 
-export async function appendWorkflowArtifactsToDailyContext(
-  userId: string,
-  artifacts: WorkflowArtifactReference[]
-): Promise<void> {
-  const current = await getLatestDailyContext(userId);
-  if (!current) {
-    return;
-  }
-  const existing = new Map(
-    current.workflowArtifactRefs.map((item) => [item.artifactId, item] as const)
-  );
-  for (const artifact of artifacts) {
-    existing.set(artifact.artifactId, artifact);
-  }
-  await upsertDailyContext({
-    ...current,
-    workflowArtifactRefs: Array.from(existing.values()),
-    generatedAtIso: new Date().toISOString()
-  });
-}
-
 export function makeSnapshotId(userId: string, dateIso = todayDateIso()) {
   return `${userId}-${dateIso}`;
-}
-
-export function buildSnapshotFromRun(
-  userId: string,
-  run: WorkflowRun,
-  summary: string
-): DailyContextSnapshot {
-  const nowIso = new Date().toISOString();
-  return {
-    id: makeSnapshotId(userId),
-    userId,
-    dateIso: todayDateIso(),
-    generatedAtIso: nowIso,
-    summary,
-    confidence: 0.75,
-    outstandingItems: run.digest?.items ?? [],
-    topBlockers: (run.digest?.items ?? []).slice(0, 2).map((item) => item.title),
-    whatChanged: [`Workflow ${run.workflowId} completed at ${new Date(run.finishedAtIso).toLocaleTimeString()}`],
-    digest: run.digest ?? {
-      generatedAtIso: nowIso,
-      summary: "No digest available for this run.",
-      items: [],
-      signals: []
-    },
-    sourceStatuses: [],
-    workflowArtifactRefs: run.artifactRefs ?? [],
-    llmModel: "llm-primary",
-    fallbackUsed: true
-  };
 }

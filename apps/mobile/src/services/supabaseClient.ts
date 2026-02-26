@@ -59,8 +59,11 @@ function getStorage(): AuthStorage {
     // ExpoSQLite native module not available
   }
   try {
-    const AsyncStorage = require("@react-native-async-storage/async-storage").default;
-    return AsyncStorage;
+    const mod = require("@react-native-async-storage/async-storage");
+    const AsyncStorage = mod.default ?? mod;
+    if (AsyncStorage?.getItem && AsyncStorage?.setItem && AsyncStorage?.removeItem) {
+      return AsyncStorage;
+    }
   } catch {
     // AsyncStorage native module not available
   }

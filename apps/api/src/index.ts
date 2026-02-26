@@ -58,6 +58,17 @@ import {
 const app = express();
 app.use(express.json({ limit: "20mb" }));
 
+app.use((req, res, next) => {
+  const start = performance.now();
+  res.on("finish", () => {
+    const ms = (performance.now() - start).toFixed(1);
+    const status = res.statusCode;
+    const tag = status >= 500 ? "ERROR" : status >= 400 ? "WARN" : "OK";
+    console.log(`[${tag}] ${req.method} ${req.originalUrl} ${status} ${ms}ms`);
+  });
+  next();
+});
+
 app.use("/v1", async (req, res, next) => {
   if (req.path.startsWith("/integrations/") && req.path.endsWith("/callback")) {
     next();
@@ -387,8 +398,10 @@ app.get("/v1/history/:userId/:runId", async (req, res) => {
 });
 
 app.get("/v1/metrics/:userId", async (req, res) => {
-  const runs = await listWorkflowRuns(req.params.userId);
-  const snapshot = await getLatestDailyContext(req.params.userId);
+  const [runs, snapshot] = await Promise.all([
+    listWorkflowRuns(req.params.userId),
+    getLatestDailyContext(req.params.userId)
+  ]);
   const metrics = computeProductMetrics(runs, snapshot);
   res.json({ metrics });
 });
@@ -401,24 +414,32 @@ app.get("/v1/digest/:userId", async (req, res) => {
 
 app.post("/v1/assistant/:userId/query", async (req, res) => {
   const payload = req.body as AssistantQueryRequest;
-  const chat =
+  const attachments = payload.attachments ?? [];
+
+  if (payload.timezone?.trim()) {
+    void upsertUserTimezone(req.params.userId, payload.timezone.trim());
+  }
+
+  const [chat, runs, initialSnapshot, audioTranscript, externalItems] = await Promise.all([
     payload.chatId
-      ? { id: payload.chatId }
-      : await createAssistantChat(req.params.userId, payload.question);
-  const runs = await listWorkflowRuns(req.params.userId);
-  let snapshot = await getLatestDailyContext(req.params.userId);
+      ? Promise.resolve({ id: payload.chatId })
+      : createAssistantChat(req.params.userId, payload.question),
+    listWorkflowRuns(req.params.userId),
+    getLatestDailyContext(req.params.userId),
+    transcribeAudioAttachment(attachments),
+    listExternalItems(req.params.userId)
+  ]);
+
+  let snapshot = initialSnapshot;
   if (!snapshot) {
     try {
       const { snapshot: fresh } = await runDailyContextPipeline(req.params.userId);
       snapshot = fresh;
-      await logPipelineTrace(req.params.userId, ["assistant.on-demand-pipeline"], snapshot.id);
+      void logPipelineTrace(req.params.userId, ["assistant.on-demand-pipeline"], snapshot.id);
     } catch (err) {
       console.warn("[assistant] On-demand pipeline failed:", err);
     }
   }
-  const attachments = payload.attachments ?? [];
-  const audioTranscript = await transcribeAudioAttachment(attachments);
-  let externalItems = await listExternalItems(req.params.userId);
 
   const calendarKeywords =
     /(meeting|meetings|calendar|schedule|free|busy|appointment|event|day|today|scheduled)/i;
@@ -428,31 +449,31 @@ app.post("/v1/assistant/:userId/query", async (req, res) => {
     /(do\s+i\s+have|what\s+do\s+i\s+have)\s+(any\s+)?(meetings?|events?|appointments?|today|scheduled)/i.test(
       payload.question
     );
+
+  let finalItems = externalItems;
   if (isCalendarQuestion) {
     try {
       await syncGoogleCalendarForUser(req.params.userId);
-      externalItems = await listExternalItems(req.params.userId);
+      finalItems = await listExternalItems(req.params.userId);
     } catch (err) {
       console.warn("[assistant] On-demand calendar sync failed:", err);
     }
   }
+
   const slackUserIds = new Set<string>();
-  for (const item of externalItems) {
+  for (const item of finalItems) {
     if (item.sender) slackUserIds.add(item.sender);
     const text = `${item.title} ${item.summary}`;
     const matches = text.matchAll(SLACK_MENTION_REGEX);
     for (const m of matches) slackUserIds.add(m[1] || m[2] || "");
   }
-  const slackUserNames = await resolveSlackUserNames(req.params.userId, [...slackUserIds]);
 
-  if (payload.timezone?.trim()) {
-    void upsertUserTimezone(req.params.userId, payload.timezone.trim());
-  }
-
-  const chatHistory =
+  const [slackUserNames, chatHistory] = await Promise.all([
+    resolveSlackUserNames(req.params.userId, [...slackUserIds]),
     chat.id && payload.chatId
-      ? (await listAssistantChatMessages(req.params.userId, chat.id)).slice(-10)
-      : [];
+      ? listAssistantChatMessages(req.params.userId, chat.id).then((msgs) => msgs.slice(-10))
+      : Promise.resolve([] as Awaited<ReturnType<typeof listAssistantChatMessages>>)
+  ]);
 
   const userMessage = await appendAssistantChatMessage({
     userId: req.params.userId,
@@ -469,7 +490,7 @@ app.post("/v1/assistant/:userId/query", async (req, res) => {
     runs,
     attachments,
     audioTranscript,
-    externalItems,
+    finalItems,
     slackUserNames,
     chatHistory,
     payload.timezone
@@ -482,7 +503,7 @@ app.post("/v1/assistant/:userId/query", async (req, res) => {
     attachments: response.attachmentsUsed ?? [],
     contextReferences: response.contextReferences ?? []
   });
-  await logAssistantAudit(req.params.userId, payload.question, response, snapshot?.id ?? null);
+  void logAssistantAudit(req.params.userId, payload.question, response, snapshot?.id ?? null);
   res.json({
     response,
     chatId: chat.id,

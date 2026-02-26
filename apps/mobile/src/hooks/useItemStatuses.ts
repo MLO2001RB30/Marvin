@@ -18,8 +18,9 @@ let _storage: { getItem: (k: string) => Promise<string | null>; setItem: (k: str
 function getStorage() {
   if (_storage) return _storage;
   try {
-    const AsyncStorage = require("@react-native-async-storage/async-storage").default;
-    if (AsyncStorage?.getItem) {
+    const mod = require("@react-native-async-storage/async-storage");
+    const AsyncStorage = mod.default ?? mod;
+    if (AsyncStorage?.getItem && AsyncStorage?.setItem) {
       _storage = {
         getItem: async (k) => {
           try {

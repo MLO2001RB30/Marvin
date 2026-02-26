@@ -252,17 +252,21 @@ export async function resolveSlackUserNames(
   const token = await getSlackAccessToken(userId);
   if (!token) return new Map();
   const unique = [...new Set(userIds.filter(Boolean))];
-  const map = new Map<string, string>();
-  for (const uid of unique) {
-    try {
+  if (unique.length === 0) return new Map();
+  const results = await Promise.allSettled(
+    unique.map(async (uid) => {
       const res = await slackApiGet(token, "users.info", { user: uid });
       if (res.ok && res.user && typeof res.user === "object") {
         const u = res.user as { real_name?: string; profile?: { display_name?: string } };
-        const name = u.real_name || u.profile?.display_name || uid;
-        map.set(uid, name);
+        return [uid, u.real_name || u.profile?.display_name || uid] as const;
       }
-    } catch {
-      // Skip on error
+      return null;
+    })
+  );
+  const map = new Map<string, string>();
+  for (const result of results) {
+    if (result.status === "fulfilled" && result.value) {
+      map.set(result.value[0], result.value[1]);
     }
   }
   return map;

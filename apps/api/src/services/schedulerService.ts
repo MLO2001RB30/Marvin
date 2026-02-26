@@ -29,10 +29,3 @@ export function startScheduler() {
   }, env.PIPELINE_TICK_MS);
 }
 
-export function stopScheduler() {
-  if (!timer) {
-    return;
-  }
-  clearInterval(timer);
-  timer = null;
-}
