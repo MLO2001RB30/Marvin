@@ -35,6 +35,15 @@ curl -X POST "${SUPABASE_URL}/auth/v1/token?grant_type=password" \
 ```
 Use the `access_token` from the response as `Authorization: Bearer <token>`. The `user.id` field must match the `:userId` param in API routes.
 
+### LLM provider configuration
+
+The LLM client (`apps/api/src/ai/llm/client.ts`) supports any OpenAI-compatible API:
+- `OPENAI_BASE_URL` — defaults to `https://api.openai.com/v1`. Set to `https://openrouter.ai/api/v1` for OpenRouter.
+- `OPENAI_API_KEY` — the API key for the configured provider.
+- `OPENAI_MODEL` — the model name (e.g. `gpt-5.2`, `anthropic/claude-sonnet-4.5`).
+
+Tool calling loop: the model may make up to 3 iterations of tool calls per request. Each iteration is a separate LLM API call. Most of the assistant endpoint latency comes from this loop (typically 2-3 iterations × model inference time).
+
 ### dotenv behavior
 
 The API loads `apps/api/.env` via dotenv, which does **not** override existing environment variables by default. When secrets are injected into the environment (e.g. via Cursor Cloud secrets), dotenv only fills in vars not already set. This is correct behavior — no need to override.
