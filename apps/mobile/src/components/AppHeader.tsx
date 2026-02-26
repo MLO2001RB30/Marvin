@@ -67,7 +67,8 @@ export function AppHeader({
           color: colors.textPrimary,
           fontSize: titleSize,
           fontWeight: compact ? "600" : "400",
-          letterSpacing: compact ? -0.3 : -0.5
+          letterSpacing: compact ? -0.3 : -0.5,
+          fontFamily: compact ? "Georgia" : undefined
         }}
       >
         {title}

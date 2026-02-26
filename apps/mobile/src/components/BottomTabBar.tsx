@@ -21,9 +21,14 @@ export function BottomTabBar({
         borderColor: colors.border,
         borderRadius: radius.pill,
         backgroundColor: colors.bgSurface,
-        padding: spacing.xxs,
+        padding: spacing.xs,
         flexDirection: "row",
-        justifyContent: "space-around"
+        justifyContent: "space-around",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 8
       }}
     >
       {rootTabs.map((tab) => {
