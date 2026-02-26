@@ -37,12 +37,16 @@ Use the `access_token` from the response as `Authorization: Bearer <token>`. The
 
 ### LLM provider configuration
 
-The LLM client (`apps/api/src/ai/llm/client.ts`) supports any OpenAI-compatible API:
-- `OPENAI_BASE_URL` — defaults to `https://api.openai.com/v1`. Set to `https://openrouter.ai/api/v1` for OpenRouter.
-- `OPENAI_API_KEY` — the API key for the configured provider.
-- `OPENAI_MODEL` — the model name (e.g. `gpt-5.2`, `anthropic/claude-sonnet-4.5`).
+The LLM client (`apps/api/src/ai/llm/client.ts`) supports any OpenAI-compatible API via OpenRouter:
+- `OPENAI_BASE_URL` — defaults to `https://openrouter.ai/api/v1`.
+- `OPENAI_API_KEY` — the OpenRouter API key.
+- `OPENAI_MODEL` — defaults to `anthropic/claude-sonnet-4.5` (Claude Sonnet 4.5 via OpenRouter).
+
+The client automatically adds `HTTP-Referer` and `X-Title` headers when the base URL points to OpenRouter.
 
 Tool calling loop: the model may make up to 3 iterations of tool calls per request. Each iteration is a separate LLM API call. Most of the assistant endpoint latency comes from this loop (typically 2-3 iterations × model inference time).
+
+Audio transcription is not available through OpenRouter; the transcription service gracefully falls back when the base URL is openrouter.ai.
 
 ### dotenv behavior
 
