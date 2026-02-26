@@ -96,40 +96,38 @@ export async function syncGmailForUser(userId: string): Promise<number> {
   }> = [];
   const now = new Date().toISOString();
 
-  for (const msg of messages.slice(0, MAX_MESSAGES)) {
-    try {
-      const fullMsg = (await gmailApiGet(token, `/messages/${msg.id}`, {
-        format: "metadata"
-      })) as GmailMessage;
-
-      const headers = collectHeaders(fullMsg.payload);
-      const subject = getHeader(headers, "Subject") || "(No subject)";
-      const from = getHeader(headers, "From");
-      const snippet = fullMsg.snippet ?? "";
-      const preview = snippet.slice(0, 600) + (snippet.length > 600 ? "…" : "");
-
-      const id = `gmail-${userId}-${msg.id}`;
-      const sourceRef = `${msg.threadId}:${msg.id}`;
-      const title = subject.slice(0, 80) + (subject.length > 80 ? "…" : "");
-      const summary = `From: ${from}\nSubject: ${subject}\n${preview}`;
-      const isOutstanding = shouldBeOutstandingGmail(subject, from);
-
-      items.push({
-        id,
-        provider: "gmail",
-        type: "gmail_thread",
-        sourceRef,
-        title,
-        summary,
-        requiresReply: false,
-        isOutstanding,
-        sender: from || undefined,
-        tags: ["gmail_sync"],
-        created_at_iso: now,
-        updated_at_iso: now
-      });
-    } catch {
-      // Skip failed message fetches
+  const BATCH_SIZE = 10;
+  const toFetch = messages.slice(0, MAX_MESSAGES);
+  for (let i = 0; i < toFetch.length; i += BATCH_SIZE) {
+    const batch = toFetch.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map((msg) =>
+        gmailApiGet(token, `/messages/${msg.id}`, { format: "metadata" }).then((fullMsg) => {
+          const fm = fullMsg as GmailMessage;
+          const headers = collectHeaders(fm.payload);
+          const subject = getHeader(headers, "Subject") || "(No subject)";
+          const from = getHeader(headers, "From");
+          const snippet = fm.snippet ?? "";
+          const preview = snippet.slice(0, 600) + (snippet.length > 600 ? "…" : "");
+          return {
+            id: `gmail-${userId}-${msg.id}`,
+            provider: "gmail" as const,
+            type: "gmail_thread" as const,
+            sourceRef: `${msg.threadId}:${msg.id}`,
+            title: subject.slice(0, 80) + (subject.length > 80 ? "…" : ""),
+            summary: `From: ${from}\nSubject: ${subject}\n${preview}`,
+            requiresReply: false,
+            isOutstanding: shouldBeOutstandingGmail(subject, from),
+            sender: from || undefined,
+            tags: ["gmail_sync"] as string[],
+            created_at_iso: now,
+            updated_at_iso: now
+          };
+        })
+      )
+    );
+    for (const r of results) {
+      if (r.status === "fulfilled") items.push(r.value);
     }
   }
 
