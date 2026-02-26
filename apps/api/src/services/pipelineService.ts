@@ -1,10 +1,7 @@
 import type { DailyContextSnapshot } from "@pia/shared";
 
 import { buildOutstandingDigest } from "./digestService";
-import { buildDigestWithLLM } from "./llmService";
-import { extractCommitments } from "./commitmentService";
 import { listExternalItems, listIntegrationAccounts } from "./integrationService";
-import { summarizeDailyContext } from "./llmService";
 import { syncGmailForUser } from "./gmailSyncService";
 import { syncGoogleCalendarForUser } from "./googleCalendarSyncService";
 import { syncGoogleDriveForUser } from "./googleDriveSyncService";
@@ -44,24 +41,16 @@ export async function runDailyContextPipeline(userId: string): Promise<PipelineR
   ]);
   traces.push("pipeline.ingest.complete");
 
-  const digest = await buildDigestWithLLM(
-    { items, dateIso: dateIsoNow() },
-    () => buildOutstandingDigest(items)
-  );
-  traces.push("pipeline.digest.complete");
-  const commitments = await extractCommitments(items);
-  if (commitments.length > 0) {
-    traces.push(`pipeline.commitments:${commitments.length}`);
-  }
+  const digest = buildOutstandingDigest(items);
+  traces.push("pipeline.digest.deterministic");
 
-  const summary = await summarizeDailyContext({
-    userId,
-    dateIso: dateIsoNow(),
-    items,
-    integrations,
-    curatedItems: digest.items
-  });
-  traces.push(summary.usedFallback ? "pipeline.summarize.fallback" : "pipeline.summarize.llm");
+  const outstanding = digest.items;
+  const top = outstanding.slice(0, 3).map((item) => item.title);
+  const summary = `You have ${outstanding.length} outstanding items across ${integrations.filter((a) => a.status === "connected").length} connected integrations.`;
+  const topBlockers = top.slice(0, 2);
+  const whatChanged = top.length
+    ? [`Top item: ${top[0]}`]
+    : ["No outstanding items detected."];
 
   const latestRun = runs[0];
   const snapshot: DailyContextSnapshot = {
@@ -69,13 +58,13 @@ export async function runDailyContextPipeline(userId: string): Promise<PipelineR
     userId,
     dateIso: dateIsoNow(),
     generatedAtIso,
-    summary: summary.summary,
-    confidence: summary.confidence,
+    summary,
+    confidence: 0.7,
     outstandingItems: digest.items,
-    topBlockers: summary.topBlockers,
+    topBlockers,
     whatChanged:
-      summary.whatChanged.length > 0
-        ? summary.whatChanged
+      whatChanged.length > 0
+        ? whatChanged
         : latestRun
           ? [`Latest workflow ${latestRun.workflowId} completed ${latestRun.finishedAtIso}`]
           : ["No workflow runs yet today"],
@@ -87,9 +76,9 @@ export async function runDailyContextPipeline(userId: string): Promise<PipelineR
       lastSyncAtIso: item.lastSyncAtIso
     })),
     workflowArtifactRefs: runs.flatMap((run) => run.artifactRefs ?? []).slice(0, 20),
-    commitments,
-    llmModel: summary.model,
-    fallbackUsed: summary.usedFallback
+    commitments: [],
+    llmModel: "deterministic",
+    fallbackUsed: false
   };
 
   await upsertDailyContext(snapshot);

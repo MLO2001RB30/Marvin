@@ -199,7 +199,7 @@ export function BriefTabScreen() {
   const stackHeightFor = (n: number) => CARD_HEIGHT * (1 + 0.2 * Math.max(0, n - 1));
   const openItemsCardHeight = Math.round(screenHeight * 0.75);
 
-  const headline = dailyBrief?.headline;
+  const headline = dailyBrief?.headline ?? latestContext?.summary;
 
   return (
     <View style={{ gap: spacing.section }}>

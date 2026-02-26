@@ -42,7 +42,6 @@ import { executeWorkflow } from "./services/orchestrationService";
 import { computeProductMetrics } from "./services/metricsService";
 import { getLatestDailyContext, upsertDailyContext } from "./services/contextSnapshotService";
 import { runDailyContextPipeline } from "./services/pipelineService";
-import { runDailyBriefForUser } from "./jobs/dailyBriefJob";
 import { getLatestDailyBrief } from "./services/dailyBriefService";
 import { startScheduler } from "./services/schedulerService";
 import { getSupabaseClient } from "./services/supabaseClient";
@@ -180,14 +179,8 @@ app.get("/v1/context/:userId/latest", async (req, res) => {
 
 app.post("/v1/context/:userId/pipeline/run", async (req, res) => {
   const { snapshot, traces } = await runDailyContextPipeline(req.params.userId);
-  await logPipelineTrace(req.params.userId, traces, snapshot.id);
-  let dailyBrief = null;
-  try {
-    dailyBrief = await runDailyBriefForUser(req.params.userId);
-  } catch (err) {
-    console.warn("[pipeline] Daily brief job failed:", err);
-  }
-  res.json({ snapshot, traces, dailyBrief });
+  void logPipelineTrace(req.params.userId, traces, snapshot.id);
+  res.json({ snapshot, traces, dailyBrief: null });
 });
 
 app.get("/v1/brief/:userId/daily", async (req, res) => {
