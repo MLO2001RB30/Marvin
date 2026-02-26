@@ -445,13 +445,15 @@ function ChatMessageBubble({
   colors,
   spacing,
   radius,
-  typography
+  typography,
+  onAction
 }: {
   message: AssistantChatMessage;
   colors: { textPrimary: string; textSecondary: string; textTertiary: string; border: string; bgSurface: string; bgSurfaceAlt: string; accentGold: string; accentGoldTint: string; danger: string; success: string; info: string };
   spacing: { xxs: number; xs: number; sm: number; md: number; lg: number };
   radius: { card: number };
   typography: { sizes: { xs: number; sm: number; md: number; lg: number } };
+  onAction?: (action: import("@pia/shared").RecommendedAction) => void;
 }) {
   const isAssistant = message.role === "assistant";
   const isThinking = message.id === "thinking-placeholder";
@@ -496,6 +498,7 @@ function ChatMessageBubble({
             colors={colors}
             typography={typography}
             spacing={spacing}
+            onAction={onAction}
           />
         ) : message.role === "assistant" ? (
           <FormattedAssistantMessage
@@ -564,6 +567,50 @@ export function AssistantTabScreen() {
     workflows.length > 0
   );
   const { colors, spacing, typography, radius, icon } = useTheme();
+  function handleChatAction(action: import("@pia/shared").RecommendedAction) {
+    const payload = action.payload ?? {};
+    switch (action.action_type) {
+      case "reply_slack": {
+        const channelId = typeof payload.channel_id === "string" ? payload.channel_id : "";
+        const threadTs = typeof payload.thread_ts === "string" ? payload.thread_ts : undefined;
+        const draftText = typeof payload.draft === "string" ? payload.draft : "";
+        if (draftText) {
+          setText(draftText);
+        } else {
+          setText(`Reply to ${action.label.replace("Reply in Slack", "").trim() || "Slack message"}...`);
+        }
+        setTimeout(() => inputRef.current?.focus(), 50);
+        break;
+      }
+      case "reply_email": {
+        const draftText = typeof payload.draft === "string" ? payload.draft : "";
+        if (draftText) {
+          setText(draftText);
+        } else {
+          setText("");
+        }
+        setTimeout(() => inputRef.current?.focus(), 50);
+        break;
+      }
+      case "draft_reply": {
+        const question = `Draft a reply for: ${action.label}`;
+        void sendAssistantMessage({ question });
+        break;
+      }
+      case "create_event": {
+        const question = `Create a calendar event: ${typeof payload.title === "string" ? payload.title : action.label}`;
+        void sendAssistantMessage({ question });
+        break;
+      }
+      case "run_workflow": {
+        const question = `Run the workflow: ${action.label}`;
+        void sendAssistantMessage({ question });
+        break;
+      }
+      default:
+        break;
+    }
+  }
   const [text, setText] = useState("");
   const [imageAttachment, setImageAttachment] = useState<AssistantAttachment | null>(null);
   const [audioAttachment, setAudioAttachment] = useState<AssistantAttachment | null>(null);
@@ -900,6 +947,7 @@ export function AssistantTabScreen() {
                   spacing={spacing}
                   radius={radius}
                   typography={typography}
+                  onAction={handleChatAction}
                 />
               ))}
             </View>

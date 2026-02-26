@@ -667,6 +667,54 @@ app.get("/v1/team/:teamId/brief", async (req, res) => {
   });
 });
 
+// ---- Real-time webhook endpoints (no auth — verified by provider signatures) ----
+
+app.post("/webhooks/slack/events", async (req, res) => {
+  try {
+    const { handleSlackEventPayload } = await import("./services/realtimeSyncService");
+    const result = await handleSlackEventPayload(req.body as Record<string, unknown>);
+    if (result.challenge) {
+      res.set("Content-Type", "text/plain").send(result.challenge);
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.warn("[webhook] Slack event error:", err);
+    res.status(200).json({ ok: true });
+  }
+});
+
+app.post("/webhooks/gmail/push", async (req, res) => {
+  try {
+    const { handleGmailPushNotification } = await import("./services/realtimeSyncService");
+    await handleGmailPushNotification(req.body as Record<string, unknown>);
+    res.status(204).send();
+  } catch (err) {
+    console.warn("[webhook] Gmail push error:", err);
+    res.status(204).send();
+  }
+});
+
+app.post("/webhooks/calendar/push", async (req, res) => {
+  try {
+    const { handleCalendarPushNotification } = await import("./services/realtimeSyncService");
+    const headers: Record<string, string | undefined> = {
+      "x-goog-channel-id": req.headers["x-goog-channel-id"] as string | undefined,
+      "x-goog-resource-state": req.headers["x-goog-resource-state"] as string | undefined
+    };
+    await handleCalendarPushNotification(headers);
+    res.status(204).send();
+  } catch (err) {
+    console.warn("[webhook] Calendar push error:", err);
+    res.status(204).send();
+  }
+});
+
+app.get("/webhooks/status", async (_req, res) => {
+  const { getRecentWebhookEvents } = await import("./services/realtimeSyncService");
+  res.json({ events: getRecentWebhookEvents(), count: getRecentWebhookEvents().length });
+});
+
 app.listen(env.PORT, () => {
   startScheduler();
   console.log(`PIA API listening on port ${env.PORT}`);

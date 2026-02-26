@@ -17,6 +17,7 @@ import { buildContextEnvelope } from "../ai/context/buildContextEnvelope";
 import { callLLM } from "../ai/llm/client";
 import { createToolExecutor, getAssistantTools } from "../ai/tools/registry";
 import { getUserTimezone } from "./userProfileService";
+import { listUserMemories, buildMemoryPromptSection, extractMemoriesFromConversation } from "./userMemoryService";
 
 function isValidTimezone(tz: string): boolean {
   if (tz === "UTC" || tz === "GMT") return true;
@@ -131,10 +132,14 @@ export async function answerAssistantQuestion(
     });
   }
 
+  const memories = await listUserMemories(userId);
+  const memorySection = buildMemoryPromptSection(memories);
+
   const systemPrompts = [
     loadCoreIdentityPrompt(),
     loadModePrompt("ASSISTANT_QA_GROUNDED_v1"),
-    `Date context: Today is ${today} (${todayDay}). User timezone: ${userTimezone}. Each Slack message includes [sent YYYY-MM-DD] so you know when it was written.`
+    `Date context: Today is ${today} (${todayDay}). User timezone: ${userTimezone}. Each Slack message includes [sent YYYY-MM-DD] so you know when it was written.`,
+    ...(memorySection ? [memorySection] : [])
   ];
 
   let userContent = `User question: ${question}`;
@@ -210,6 +215,8 @@ export async function answerAssistantQuestion(
           )
         )
       : undefined;
+
+    void extractMemoriesFromConversation(userId, question, answerText);
 
     return {
       question,
