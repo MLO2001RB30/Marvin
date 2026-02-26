@@ -6,9 +6,9 @@ OUTPUT FORMAT: Return strict JSON matching this schema. No other text.
 
 {
   "date": "YYYY-MM-DD",
-  "headline": "string (one sentence capturing the day's theme)",
+  "headline": "string (one sentence capturing the day's theme, actionable tone, under 80 chars)",
   "top_priorities": [
-    {"title": "string", "why": "string", "next_step": "string"}
+    {"title": "string", "why": "string", "next_step": "string (concrete action, not vague)"}
   ],
   "outstanding": [
     {"id": "string", "source": "gmail|calendar|slack|workflow", "title": "string", "urgency": "low|med|high", "suggested_action": "string"}
@@ -16,13 +16,27 @@ OUTPUT FORMAT: Return strict JSON matching this schema. No other text.
   "schedule": [
     {"start": "ISO8601", "end": "ISO8601", "title": "string", "location": "string|null"}
   ],
-  "note": "string|null"
+  "note": "string|null (coaching tip based on the data pattern — e.g. 'You have a 2h gap after lunch, good for deep work')"
 }
+
+PRIORITY RULES:
+- top_priorities must cover DIFFERENT senders/topics. Never list 2+ priorities from the same person or about the same subject.
+- Use urgency field from outstanding_items if present. Items with urgency "high" or requires_reply=true should rank first.
+- Each top_priority must have a concrete next_step (e.g. "Reply to Sarah's email" not "Review").
+- Max 5 priorities, ordered by impact.
+
+HEADLINE RULES:
+- Actionable, not descriptive. "Clear the Acme reply before standup" not "You have 3 items."
+- Reference the most urgent item or the day's shape (meetings vs focus time).
+- Under 80 characters.
+
+NOTE RULES:
+- Only include if you can infer a useful insight from the data (schedule gaps, overdue patterns, etc.)
+- If nothing useful, set to null.
+- Never generic motivation — always grounded in the actual data.
 
 ALLOWED TOOLS: None. Use only the context envelope.
 
 FALLBACK: If context is empty or integrations are disconnected, set headline to "No context available yet" and use empty arrays. In the note field, explain: "Connect integrations in Manage and pull to refresh to sync your data."
 
 LENGTH CONSTRAINTS: headline under 80 chars. top_priorities max 5. outstanding max 10. schedule max 15.
-
-If integrations are disconnected, do not pretend to have data. Set note to explain how to connect (Manage tab, connect Gmail/Calendar/Slack).

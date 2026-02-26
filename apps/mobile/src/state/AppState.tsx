@@ -492,13 +492,16 @@ export function AppStateProvider({
       sendAssistantMessage,
       appendAssistantMessages,
       refreshAssistantAnswer: async () => {
-        const { response } = await api.askAssistant({
+        const { response, assistantMessage } = await api.askAssistant({
           question: "What is blocking me this morning?",
           chatId: assistantActiveChatId ?? undefined,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         });
         setAssistantAnswer(response.answer);
         setAssistantReferences(response.contextReferences ?? null);
+        if (response.structured && assistantMessage) {
+          setAssistantMessages((current) => [...current, { ...assistantMessage, structured: response.structured }]);
+        }
       },
       userTimezone,
       setUserTimezone,

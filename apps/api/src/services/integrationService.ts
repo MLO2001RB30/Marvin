@@ -45,20 +45,78 @@ export async function listExternalItems(userId: string): Promise<ExternalItem[]>
     .eq("user_id", userId)
     .order("updated_at_iso", { ascending: false });
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    provider: row.provider,
-    type: row.type,
-    sourceRef: row.source_ref,
-    title: row.title,
-    summary: row.summary,
-    requiresReply: Boolean(row.requires_action ?? row.requires_reply),
-    isOutstanding: row.status === "new" || row.status === "open" || Boolean(row.is_outstanding),
-    sender: row.sender ?? undefined,
-    tags: row.tags ?? [],
-    createdAtIso: row.created_at_iso,
-    updatedAtIso: row.updated_at_iso
-  })) as ExternalItem[];
+  const SLACK_ID_RE = /^[UW][A-Z0-9]{8,}$/i;
+  const SLACK_MENTION_RE = /<@([UW][A-Z0-9]{8,})>/gi;
+  const slackIds = new Set<string>();
+  for (const row of data ?? []) {
+    if (row.provider === "slack" && row.sender && SLACK_ID_RE.test(row.sender)) {
+      slackIds.add(row.sender);
+    }
+    const text = `${row.title ?? ""} ${row.summary ?? ""}`;
+    for (const m of text.matchAll(SLACK_MENTION_RE)) {
+      if (m[1]) slackIds.add(m[1]);
+    }
+  }
+
+  let nameMap = new Map<string, string>();
+  if (slackIds.size > 0) {
+    try {
+      const { data: identRows } = await client
+        .from("contact_identifiers")
+        .select("identifier, contact_id")
+        .eq("user_id", userId)
+        .eq("identifier_type", "slack_user_id")
+        .in("identifier", [...slackIds]);
+      if (identRows && identRows.length > 0) {
+        const contactIds = identRows.map((r: Record<string, unknown>) => r.contact_id as string);
+        const { data: contactRows } = await client
+          .from("contacts")
+          .select("id, display_name")
+          .in("id", contactIds);
+        const contactNameMap = new Map<string, string>();
+        for (const c of contactRows ?? []) {
+          contactNameMap.set(c.id as string, c.display_name as string);
+        }
+        for (const r of identRows) {
+          const name = contactNameMap.get(r.contact_id as string);
+          if (name) nameMap.set(r.identifier as string, name);
+        }
+      }
+    } catch {
+      // Name resolution is best-effort
+    }
+  }
+
+  function resolveSlackText(text: string): string {
+    if (!text || nameMap.size === 0) return text;
+    let result = text;
+    for (const [id, name] of nameMap) {
+      result = result.replace(new RegExp(`<@${id}>`, "g"), `@${name}`);
+    }
+    return result;
+  }
+
+  return (data ?? []).map((row) => {
+    const isSlack = row.provider === "slack";
+    const senderRaw = row.sender ?? undefined;
+    const sender = isSlack && senderRaw && nameMap.has(senderRaw)
+      ? nameMap.get(senderRaw)
+      : senderRaw;
+    return {
+      id: row.id,
+      provider: row.provider,
+      type: row.type,
+      sourceRef: row.source_ref,
+      title: isSlack ? resolveSlackText(row.title) : row.title,
+      summary: isSlack ? resolveSlackText(row.summary) : row.summary,
+      requiresReply: Boolean(row.requires_action ?? row.requires_reply),
+      isOutstanding: row.status === "new" || row.status === "open" || Boolean(row.is_outstanding),
+      sender,
+      tags: row.tags ?? [],
+      createdAtIso: row.created_at_iso,
+      updatedAtIso: row.updated_at_iso
+    };
+  }) as ExternalItem[];
 }
 
 function normalizeProvider(provider: string): IntegrationProvider | null {

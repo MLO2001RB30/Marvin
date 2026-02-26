@@ -76,16 +76,24 @@ export async function buildContextEnvelope(
     }));
 
   const outstandingRaw = items.filter((i) => i.isOutstanding);
-  const outstandingItems = outstandingRaw.slice(0, MAX_OUTSTANDING).map((i) => ({
-    id: i.id,
-    provider: i.provider,
-    title: i.title,
-    summary: (i.summary ?? "").slice(0, 200),
-    body_text: ((i as unknown as Record<string, unknown>).bodyText as string | undefined)?.slice(0, 500) ?? undefined,
-    sender: i.sender,
-    requires_reply: i.requiresReply,
-    urgency: i.tags.includes("urgent") ? "high" : i.requiresReply ? "med" : "low"
-  }));
+  const outstandingItems = outstandingRaw.slice(0, MAX_OUTSTANDING).map((i) => {
+    const raw = i as unknown as Record<string, unknown>;
+    const dbUrgency = typeof raw.urgencyScore === "number" ? raw.urgencyScore : undefined;
+    const urgency = dbUrgency !== undefined
+      ? (dbUrgency >= 70 ? "high" : dbUrgency >= 40 ? "med" : "low")
+      : (i.tags.includes("urgent") ? "high" : i.requiresReply ? "med" : "low");
+    return {
+      id: i.id,
+      provider: i.provider,
+      title: i.title,
+      summary: (i.summary ?? "").slice(0, 200),
+      body_text: (raw.bodyText as string | undefined)?.slice(0, 500) ?? undefined,
+      sender: i.sender,
+      source_ref: i.sourceRef,
+      requires_reply: i.requiresReply,
+      urgency
+    };
+  });
 
   const calendarRaw = items.filter(
     (i) => i.provider === "google_calendar" && i.type === "calendar_event" && !i.sourceRef?.startsWith("initial-sync")
@@ -109,6 +117,7 @@ export async function buildContextEnvelope(
       title: i.title,
       sender: i.sender,
       summary: (i.summary ?? "").slice(0, 200),
+      source_ref: i.sourceRef,
       requires_reply: i.requiresReply
     }));
 
@@ -120,6 +129,7 @@ export async function buildContextEnvelope(
       title: i.title,
       sender: i.sender,
       summary: (i.summary ?? "").slice(0, 200),
+      source_ref: i.sourceRef,
       requires_reply: i.requiresReply
     }));
 
