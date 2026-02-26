@@ -209,6 +209,12 @@ export function createApiClient({ userId, accessToken }: ApiClientOptions) {
         { method: "GET" },
         accessToken
       ),
+    searchItems: (query: string) =>
+      request<{ results: Array<{ id: string; provider: string; type: string; title: string; summary: string; sender?: string; bodyText?: string }>; query: string }>(
+        `/v1/search/${userId}?q=${encodeURIComponent(query)}`,
+        { method: "GET" },
+        accessToken
+      ),
     getDigest: () => request<DigestResponse>(`/v1/digest/${userId}`, { method: "GET" }, accessToken),
     getProfile: () =>
       request<{ timezone: string }>(`/v1/profile/${userId}`, { method: "GET" }, accessToken),
@@ -243,6 +249,12 @@ export function createApiClient({ userId, accessToken }: ApiClientOptions) {
       request<{ success: boolean; error?: string }>(
         `/v1/reply/${userId}/slack`,
         { method: "POST", body: JSON.stringify({ channelId, text, threadTs }) },
+        accessToken
+      ),
+    getContextPackages: () =>
+      request<{ packages: Array<{ id: string; triggerType: string; title: string; summary: string; startsAtIso: string; evidence: Array<{ id: string; kind: string; title: string; summary: string | null; reason: string; provider: string | null }> }> }>(
+        `/v1/context-packages/${userId}`,
+        { method: "GET" },
         accessToken
       ),
     getSuggestions: () =>

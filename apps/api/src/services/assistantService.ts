@@ -83,6 +83,25 @@ function buildTemplateAnswer(
   };
 }
 
+function buildPreviousTurnItemsContext(chatHistory: AssistantChatMessage[]): string | null {
+  const assistantMessages = chatHistory.filter((m) => m.role === "assistant" && m.structured);
+  if (assistantMessages.length === 0) return null;
+
+  const lastStructured = assistantMessages[assistantMessages.length - 1].structured;
+  if (!lastStructured?.items || lastStructured.items.length === 0) return null;
+
+  const lines = ["PREVIOUS RESPONSE ITEMS (for resolving references like 'the first one', 'John's message', etc.):"];
+  lastStructured.items.forEach((item, idx) => {
+    const parts = [`#${idx + 1}: "${item.header}"`];
+    parts.push(`provider=${item.provider}`);
+    if (item.sender) parts.push(`from=${item.sender}`);
+    if (item.channel) parts.push(`channel=${item.channel}`);
+    if (item.item_id) parts.push(`item_id=${item.item_id}`);
+    lines.push(parts.join(", "));
+  });
+  return lines.join("\n");
+}
+
 export async function answerAssistantQuestion(
   userId: string,
   question: string,
@@ -150,6 +169,11 @@ export async function answerAssistantQuestion(
     userContent += `\n\nUser attached ${attachments.length} file(s).`;
   }
 
+  const previousItemsContext = buildPreviousTurnItemsContext(chatHistory);
+  if (previousItemsContext) {
+    userContent += `\n\n${previousItemsContext}`;
+  }
+
   let answerText: string;
   let structured: StructuredAssistantResponse | undefined;
   let recommendedActions: RecommendedAction[] = [];
@@ -159,7 +183,12 @@ export async function answerAssistantQuestion(
       systemPrompts,
       contextEnvelopeJson: envelopeJson,
       userContent,
-      chatHistory: chatHistory.map((m) => ({ role: m.role, content: m.text })),
+      chatHistory: chatHistory.map((m) => ({
+        role: m.role,
+        content: m.structured && m.role === "assistant"
+          ? JSON.stringify({ display_type: m.structured.display_type, summary: m.structured.summary, items: m.structured.items?.map((it) => ({ header: it.header, provider: it.provider, sender: it.sender, item_id: it.item_id })) })
+          : m.text
+      })),
       tools: getAssistantTools(userTimezone),
       executeTool: createToolExecutor(userId, userTimezone),
       mode: "ASSISTANT_QA_GROUNDED",

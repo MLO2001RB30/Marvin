@@ -37,6 +37,7 @@ import { SkeletonBrief } from "../../components/Skeleton";
 import { useItemStatuses } from "../../hooks/useItemStatuses";
 import { ReviewItemsScreen, type OpenItem } from "../../screens/ReviewItemsScreen";
 import { useAppState } from "../../state/AppState";
+import { createApiClient } from "../../services/apiClient";
 import { useAuthState } from "../../state/AuthState";
 import { useTheme } from "../../theme/ThemeProvider";
 
@@ -226,12 +227,14 @@ export function BriefTabScreen() {
     replyToSlack
   } = useAppState();
   const { user } = useAuthState();
+  const accessToken = user ? (user as unknown as { access_token?: string }).access_token : undefined;
   const { colors, spacing, typography, providerColors } = useTheme();
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<OpenItem | null>(null);
   const [doneFolderExpanded, setDoneFolderExpanded] = useState(false);
   const [selectedItemFromDone, setSelectedItemFromDone] = useState(false);
   const [replyText, setReplyText] = useState("");
+  const [contextPackages, setContextPackages] = useState<Array<{ id: string; triggerType: string; title: string; summary: string; startsAtIso: string; evidence: Array<{ id: string; kind: string; title: string; summary: string | null; reason: string; provider: string | null }> }>>([]);
   const { itemStatuses, setItemStatus: rawSetItemStatus, getItemStatus } = useItemStatuses(user?.id ?? "");
 
   const setItemStatus = (id: string, status: import("../../hooks/useItemStatuses").ItemStatus) => {
@@ -500,6 +503,52 @@ export function BriefTabScreen() {
               {whatChanged[0]}
             </Text>
           )}
+        </View>
+      )}
+
+      {contextPackages.length > 0 && (
+        <View style={{ gap: spacing.xs }}>
+          {contextPackages.map((pkg) => {
+            const timeMatch = pkg.startsAtIso.match(/T(\d{2}:\d{2})/);
+            const time = timeMatch ? timeMatch[1] : "";
+            return (
+              <View
+                key={pkg.id}
+                style={{
+                  backgroundColor: colors.bgSurface,
+                  borderRadius: 16,
+                  padding: spacing.md,
+                  borderWidth: 1,
+                  borderColor: colors.accentGoldTint,
+                  borderLeftWidth: 3,
+                  borderLeftColor: colors.info,
+                  gap: spacing.xs
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+                  <Feather name={pkg.triggerType === "meeting_prep" ? "calendar" : "clock"} size={14} color={colors.info} />
+                  <Text style={{ color: colors.info, fontSize: typography.sizes.xs, fontWeight: "600" }}>
+                    {pkg.triggerType === "meeting_prep" ? "Meeting prep" : "Deadline prep"} · {time}
+                  </Text>
+                </View>
+                <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
+                  {pkg.title}
+                </Text>
+                <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.xs }} numberOfLines={2}>
+                  {pkg.summary}
+                </Text>
+                {pkg.evidence.length > 0 && (
+                  <View style={{ gap: 2 }}>
+                    {pkg.evidence.slice(0, 3).map((ev) => (
+                      <Text key={ev.id} style={{ color: colors.textTertiary, fontSize: typography.sizes.xs }} numberOfLines={1}>
+                        • {ev.title}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </View>
       )}
 
