@@ -131,16 +131,16 @@ export function SignUpScreen() {
               }
               void signUp(email.trim(), password, firstName.trim());
             }}
-            style={{
-              borderWidth: 1,
-              borderColor: colors.accentGold,
+            style={({ pressed }) => ({
               borderRadius: radius.pill,
-              paddingVertical: spacing.sm,
+              paddingVertical: spacing.md,
               alignItems: "center",
-              backgroundColor: colors.accentGoldTint
-            }}
+              backgroundColor: colors.accentGold,
+              opacity: pressed ? 0.85 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }]
+            })}
           >
-            <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md }}>
+            <Text style={{ color: "#1A1A1C", fontSize: typography.sizes.md, fontWeight: "600" }}>
               Create account
             </Text>
           </Pressable>

@@ -67,16 +67,16 @@ export function LoginScreen() {
           />
           <Pressable
             onPress={() => signIn(email.trim(), password)}
-            style={{
-              borderWidth: 1,
-              borderColor: colors.accentGold,
+            style={({ pressed }) => ({
               borderRadius: radius.pill,
-              paddingVertical: spacing.sm,
+              paddingVertical: spacing.md,
               alignItems: "center",
-              backgroundColor: colors.accentGoldTint
-            }}
+              backgroundColor: colors.accentGold,
+              opacity: pressed ? 0.85 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }]
+            })}
           >
-            <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md }}>Log in</Text>
+            <Text style={{ color: "#1A1A1C", fontSize: typography.sizes.md, fontWeight: "600" }}>Log in</Text>
           </Pressable>
           <Pressable
             onPress={() => {
