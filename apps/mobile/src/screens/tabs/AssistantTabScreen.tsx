@@ -91,6 +91,7 @@ function buildSuggestedPrompts(
   hasWorkflows: boolean
 ): string[] {
   const prompts: string[] = [];
+  prompts.push("Give me my daily brief");
   prompts.push("What's on my calendar today?");
   if (topBlockers.length > 0) {
     const blocker = sanitizeForDisplay(topBlockers[0]);
@@ -552,7 +553,8 @@ export function AssistantTabScreen() {
     appendAssistantMessages,
     assistantActiveChatId,
     latestContext,
-    workflows
+    workflows,
+    runContextPipelineNow
   } = useAppState();
   const outstandingItems = latestContext?.outstandingItems ?? latestContext?.digest?.items ?? [];
   const topBlockers = latestContext?.topBlockers ?? [];
@@ -605,6 +607,9 @@ export function AssistantTabScreen() {
       case "run_workflow": {
         const question = `Run the workflow: ${action.label}`;
         void sendAssistantMessage({ question });
+        break;
+      }
+      case "none": {
         break;
       }
       default:
@@ -956,7 +961,6 @@ export function AssistantTabScreen() {
 
         {assistantMessages.length === 0 ? (
           <View
-            pointerEvents="none"
             style={{
               position: "absolute",
               top: 64,
@@ -965,12 +969,29 @@ export function AssistantTabScreen() {
               bottom: 200,
               alignItems: "center",
               justifyContent: "center",
-              paddingHorizontal: spacing.lg
+              paddingHorizontal: spacing.lg,
+              gap: spacing.md
             }}
           >
             <Text style={{ color: colors.accentGold, fontSize: typography.sizes.md, textAlign: "center" }}>
               {contextualOpening}
             </Text>
+            <Pressable
+              onPress={() => void runContextPipelineNow()}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                paddingVertical: spacing.xs,
+                paddingHorizontal: spacing.md,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: colors.border
+              }}
+            >
+              <Feather name="refresh-cw" size={13} color={colors.textSecondary} />
+              <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}>Sync latest data</Text>
+            </Pressable>
           </View>
         ) : null}
 
@@ -1048,13 +1069,13 @@ export function AssistantTabScreen() {
           </Animated.View>
         </View>
 
-        {!keyboardVisible && !hasMessages ? (
+        {!hasMessages ? (
           <View
             style={{
               position: "absolute",
               left: spacing.xs,
               right: spacing.xs,
-              bottom: 8,
+              bottom: chatboxBottom + CHATBOX_HEIGHT + 8,
               zIndex: 5,
               flexDirection: "row",
               flexWrap: "wrap",

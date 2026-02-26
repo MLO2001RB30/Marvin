@@ -363,6 +363,12 @@ export function BriefTabScreen() {
             borderLeftColor: colors.accentGold
           }}
         >
+          {briefNote && (
+            <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md, lineHeight: typography.sizes.md * 1.5 }}>
+              {briefNote}
+            </Text>
+          )}
+
           {briefPriorities.length > 0 && (
             <View style={{ gap: spacing.sm }}>
               <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
@@ -405,13 +411,6 @@ export function BriefTabScreen() {
             </View>
           )}
 
-          {briefNote && (
-            <View style={{ backgroundColor: colors.accentGoldTint, borderRadius: 10, padding: spacing.sm }}>
-              <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.xs, lineHeight: 18 }}>
-                {briefNote}
-              </Text>
-            </View>
-          )}
         </View>
       )}
 
@@ -726,6 +725,18 @@ export function BriefTabScreen() {
                               <Pressable
                                 onPress={(e) => {
                                   e.stopPropagation();
+                                  setSelectedItem(item);
+                                  setSelectedItemFromDone(false);
+                                  setReplyText("");
+                                }}
+                                hitSlop={8}
+                                style={{ padding: spacing.xs }}
+                              >
+                                <Feather name="corner-up-left" size={14} color={colors.accentGold} />
+                              </Pressable>
+                              <Pressable
+                                onPress={(e) => {
+                                  e.stopPropagation();
                                   setItemStatus(item.id, "done");
                                 }}
                                 hitSlop={8}
@@ -943,7 +954,9 @@ export function BriefTabScreen() {
                         void replyToEmail(selectedItem.id, text);
                       } else if (selectedItem.provider === "slack" && selectedItem.sourceRef) {
                         const parts = selectedItem.sourceRef.split(":");
-                        void replyToSlack(parts[0], text, parts[1]);
+                        const channelId = parts[0];
+                        const threadTs = parts[1] || undefined;
+                        void replyToSlack(channelId, text, threadTs);
                       }
                       setItemStatus(selectedItem.id, "done");
                       setSelectedItem(null);
