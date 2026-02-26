@@ -355,11 +355,25 @@ export function BriefTabScreen() {
       />
 
       {allItems.length > 0 && (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-          <ProgressRing done={doneItems.length} total={allItems.length} />
-          <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}>
-            {doneItems.length} of {allItems.length} items cleared
-          </Text>
+        <View style={{ gap: spacing.xs }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}>
+              {doneItems.length}/{allItems.length} cleared
+            </Text>
+            <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.xs }}>
+              {allItems.length - doneItems.length} remaining
+            </Text>
+          </View>
+          <View style={{ height: 4, backgroundColor: colors.border + "40", borderRadius: 2, overflow: "hidden" }}>
+            <View
+              style={{
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: doneItems.length === allItems.length ? colors.success : colors.accentGold,
+                width: `${allItems.length > 0 ? Math.round((doneItems.length / allItems.length) * 100) : 0}%`
+              }}
+            />
+          </View>
         </View>
       )}
 
@@ -426,11 +440,25 @@ export function BriefTabScreen() {
               <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
                 Schedule
               </Text>
-              {briefSchedule.slice(0, 4).map((ev, idx) => (
-                <Text key={idx} style={{ color: colors.textSecondary, fontSize: typography.sizes.xs }}>
-                  {ev.start} — {ev.title}
-                </Text>
-              ))}
+              {briefSchedule.slice(0, 4).map((ev, idx) => {
+                const timeMatch = ev.start.match(/T(\d{2}:\d{2})/);
+                const time = timeMatch ? timeMatch[1] : ev.start;
+                const dateMatch = ev.start.match(/^(\d{4}-\d{2}-\d{2})/);
+                const today = new Date().toISOString().slice(0, 10);
+                const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+                const datePrefix = dateMatch?.[1] === today ? "" : dateMatch?.[1] === tomorrow ? "Tomorrow " : "";
+                return (
+                  <View key={idx} style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+                    <Text style={{ color: colors.accentGold, fontSize: typography.sizes.xs, fontWeight: "600", width: 72 }}>
+                      {datePrefix}{time}
+                    </Text>
+                    <View style={{ width: 2, height: 12, backgroundColor: colors.accentGold, borderRadius: 1, opacity: 0.3 }} />
+                    <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.xs, flex: 1 }} numberOfLines={1}>
+                      {ev.title}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
           )}
 
@@ -521,14 +549,19 @@ export function BriefTabScreen() {
                 size={16}
                 color={colors.accentGold}
               />
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, gap: 2 }}>
                 <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
                   {s.title}
                 </Text>
-                <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.xs }} numberOfLines={1}>
+                <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.xs }} numberOfLines={2}>
                   {s.body}
                 </Text>
               </View>
+              {s.actionType === "reply" && (
+                <View style={{ backgroundColor: colors.accentGold + "18", borderRadius: 999, paddingHorizontal: spacing.sm, paddingVertical: spacing.xxs }}>
+                  <Text style={{ color: colors.accentGold, fontSize: typography.sizes.xs, fontWeight: "600" }}>Reply</Text>
+                </View>
+              )}
             </Pressable>
           ))}
         </View>
@@ -718,23 +751,25 @@ export function BriefTabScreen() {
           <View style={{ marginTop: spacing.lg, gap: spacing.xs }}>
             <Pressable
               onPress={() => setDoneFolderExpanded(!doneFolderExpanded)}
-              style={{
+              style={({ pressed }) => ({
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "space-between",
-                paddingVertical: spacing.sm
-              }}
+                paddingVertical: spacing.sm,
+                opacity: pressed ? 0.7 : 1
+              })}
             >
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
                 <Feather
                   name={doneFolderExpanded ? "chevron-down" : "chevron-right"}
                   size={18}
-                  color={colors.textSecondary}
+                  color={colors.success}
                 />
-                <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
-                  Done ({doneItems.length})
+                <Text style={{ color: colors.success, fontSize: typography.sizes.sm, fontWeight: "600" }}>
+                  {doneItems.length} cleared today
                 </Text>
               </View>
+              <Feather name="check-circle" size={14} color={colors.success} style={{ opacity: 0.5 }} />
             </Pressable>
             {doneFolderExpanded && (
               <View style={{ gap: spacing.xs }}>
@@ -797,6 +832,18 @@ export function BriefTabScreen() {
         )}
       </View>
 
+      <View style={{ alignItems: "center", paddingVertical: spacing.lg, gap: spacing.xs }}>
+        <Feather name="check-circle" size={16} color={colors.textTertiary} style={{ opacity: 0.5 }} />
+        <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.xs, textAlign: "center" }}>
+          That's everything for now
+        </Text>
+        {latestContext?.generatedAtIso && (
+          <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.xs, opacity: 0.6 }}>
+            Last synced {formatItemDate(latestContext.generatedAtIso)}
+          </Text>
+        )}
+      </View>
+
       <ReviewItemsScreen
         visible={reviewModalOpen}
         onClose={() => setReviewModalOpen(false)}
@@ -819,7 +866,7 @@ export function BriefTabScreen() {
         <Pressable
           style={{
             flex: 1,
-            backgroundColor: "rgba(0,0,0,0.4)",
+            backgroundColor: "rgba(0,0,0,0.55)",
             justifyContent: "flex-end"
           }}
           onPress={() => {
@@ -832,18 +879,23 @@ export function BriefTabScreen() {
             <Pressable
               style={{
                 backgroundColor: colors.bgSurface,
-                borderTopLeftRadius: 20,
-                borderTopRightRadius: 20,
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
                 padding: spacing.lg,
                 paddingBottom: spacing.xl,
                 borderWidth: 1,
                 borderBottomWidth: 0,
                 borderColor: colors.border,
-                maxHeight: "75%"
+                maxHeight: "80%",
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: -4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 20,
+                elevation: 10
               }}
               onPress={(e) => e.stopPropagation()}
             >
-              <View style={{ alignSelf: "center", width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: spacing.md }} />
+              <View style={{ alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: colors.border, marginBottom: spacing.md, opacity: 0.7 }} />
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.md }}>
                 {providerLogos[selectedItem.provider] ? (
                   <Image

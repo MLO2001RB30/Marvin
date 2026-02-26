@@ -617,6 +617,7 @@ export function AssistantTabScreen() {
     }
   }
   const [text, setText] = useState("");
+  const sendButtonOpacity = useRef(new Animated.Value(0)).current;
   const [imageAttachment, setImageAttachment] = useState<AssistantAttachment | null>(null);
   const [audioAttachment, setAudioAttachment] = useState<AssistantAttachment | null>(null);
   const [micPressed, setMicPressed] = useState(false);
@@ -659,6 +660,15 @@ export function AssistantTabScreen() {
   // Only compact when we have messages; avoid animating on keyboard show (causes focus loss)
   const composerCompact = assistantMessages.length > 0;
   const composerAnimation = useRef(new Animated.Value(composerCompact ? 0 : 1)).current;
+
+  useEffect(() => {
+    Animated.timing(sendButtonOpacity, {
+      toValue: (text.trim().length > 0 || imageAttachment || audioAttachment) ? 1 : 0,
+      duration: 150,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true
+    }).start();
+  }, [text, imageAttachment, audioAttachment, sendButtonOpacity]);
 
   const hasDraftAttachment = useMemo(
     () => Boolean(imageAttachment || audioAttachment),
