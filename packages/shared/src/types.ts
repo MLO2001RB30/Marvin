@@ -357,17 +357,34 @@ export interface ContextEnvelope {
     id: string;
     provider: string;
     title: string;
+    summary?: string;
+    sender?: string;
+    requires_reply?: boolean;
     urgency: string;
   }>;
   calendar_today: Array<{
     start: string;
     end: string;
     title: string;
+    organizer?: string;
+  }>;
+  email_threads?: Array<{
+    id: string;
+    title: string;
+    sender?: string;
+    summary?: string;
+    requires_reply?: boolean;
+  }>;
+  slack_messages?: Array<{
+    id: string;
+    title: string;
+    sender?: string;
+    summary?: string;
+    requires_reply?: boolean;
   }>;
   workflow_runs_recent: Array<{
     id: string;
     workflow_id: string;
     status: string;
   }>;
-  truncation_notes?: string;
 }

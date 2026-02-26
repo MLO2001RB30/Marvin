@@ -9,8 +9,10 @@ import { listWorkflowRuns } from "../../services/workflowService";
 import { getUserTimezone } from "../../services/userProfileService";
 
 const MAX_OUTSTANDING = 15;
-const MAX_CALENDAR = 10;
-const MAX_WORKFLOW_RUNS = 5;
+const MAX_CALENDAR = 15;
+const MAX_EMAILS = 10;
+const MAX_SLACK = 10;
+const MAX_WORKFLOW_RUNS = 3;
 
 function parseCalendarTimesFromSummary(summary: string): { start: string; end: string } {
   const match = summary.match(/^([\d-]+T?[\d:]*)\s*[–-]\s*([\d-]+T?[\d:]*)/);
@@ -41,7 +43,6 @@ export async function buildContextEnvelope(
   const nowIso = new Date().toISOString();
   const today = nowIso.slice(0, 10);
 
-  const needsIntegrations = true;
   const needsItems = !options.externalItems;
   const needsSnapshot = options.snapshot === undefined;
   const needsRuns = !options.runs;
@@ -49,7 +50,7 @@ export async function buildContextEnvelope(
 
   const [integrations, fetchedItems, fetchedSnapshot, fetchedRuns, fetchedTimezone] =
     await Promise.all([
-      needsIntegrations ? listIntegrationAccounts(userId) : Promise.resolve([]),
+      listIntegrationAccounts(userId),
       needsItems ? listExternalItems(userId) : Promise.resolve([]),
       needsSnapshot ? getLatestDailyContext(userId) : Promise.resolve(null),
       needsRuns ? listWorkflowRuns(userId) : Promise.resolve([]),
@@ -65,63 +66,66 @@ export async function buildContextEnvelope(
     integrations.filter((a) => a.status === "connected").map((a) => a.provider)
   );
 
-  const allProviders = [
-    "slack",
-    "gmail",
-    "google_drive",
-    "google_calendar",
-    "onedrive",
-    "dropbox",
-    "healthkit",
-    "weatherkit"
-  ] as const;
-
-  const integrationsPayload = allProviders.map((p) => ({
-    provider: p,
-    connected: connectedProviders.has(p),
-    last_sync_at: integrations.find((a) => a.provider === p)?.lastSyncAtIso
-  }));
+  const integrationsPayload = integrations
+    .filter((a) => a.status === "connected")
+    .map((a) => ({
+      provider: a.provider,
+      connected: true,
+      last_sync_at: a.lastSyncAtIso
+    }));
 
   const outstandingRaw = items.filter((i) => i.isOutstanding);
   const outstandingItems = outstandingRaw.slice(0, MAX_OUTSTANDING).map((i) => ({
     id: i.id,
     provider: i.provider,
     title: i.title,
-    summary: (i.summary ?? "").slice(0, 150),
+    summary: (i.summary ?? "").slice(0, 200),
     sender: i.sender,
     requires_reply: i.requiresReply,
     urgency: i.tags.includes("urgent") ? "high" : i.requiresReply ? "med" : "low"
   }));
-  const outstandingTruncated = outstandingRaw.length > MAX_OUTSTANDING;
 
   const calendarRaw = items.filter(
     (i) => i.provider === "google_calendar" && i.type === "calendar_event" && !i.sourceRef?.startsWith("initial-sync")
   );
-  const todayStart = `${today}T00:00:00`;
-  const todayEnd = `${today}T23:59:59`;
   const calendarToday = calendarRaw
     .filter((i) => {
       const m = i.summary.match(/^([\d-]+T?[\d:]*)/);
-      if (!m) return false;
-      const start = m[1];
-      return start >= todayStart && start <= todayEnd;
+      return m && m[1] >= `${today}T00:00:00` && m[1] <= `${today}T23:59:59`;
     })
     .slice(0, MAX_CALENDAR)
     .map((i) => {
       const { start, end } = parseCalendarTimesFromSummary(i.summary);
-      return { start, end, title: i.title };
+      return { start, end, title: i.title, organizer: i.sender };
     });
-  const calendarTruncated = calendarRaw.length > MAX_CALENDAR;
+
+  const emailThreads = items
+    .filter((i) => i.provider === "gmail" && i.type === "gmail_thread")
+    .slice(0, MAX_EMAILS)
+    .map((i) => ({
+      id: i.id,
+      title: i.title,
+      sender: i.sender,
+      summary: (i.summary ?? "").slice(0, 200),
+      requires_reply: i.requiresReply
+    }));
+
+  const slackMessages = items
+    .filter((i) => i.provider === "slack")
+    .slice(0, MAX_SLACK)
+    .map((i) => ({
+      id: i.id,
+      title: i.title,
+      sender: i.sender,
+      summary: (i.summary ?? "").slice(0, 200),
+      requires_reply: i.requiresReply
+    }));
 
   const workflowRunsRecent = runs.slice(0, MAX_WORKFLOW_RUNS).map((r) => ({
     id: r.id,
     workflow_id: r.workflowId,
     status: r.status
   }));
-
-  const truncationNotes: string[] = [];
-  if (outstandingTruncated) truncationNotes.push(`outstanding_items capped at ${MAX_OUTSTANDING}`);
-  if (calendarTruncated) truncationNotes.push(`calendar_today capped at ${MAX_CALENDAR}`);
 
   const daily_brief: ContextEnvelope["daily_brief"] =
     options.dailyBrief ??
@@ -147,7 +151,8 @@ export async function buildContextEnvelope(
     daily_brief,
     outstanding_items: outstandingItems,
     calendar_today: calendarToday,
-    workflow_runs_recent: workflowRunsRecent,
-    truncation_notes: truncationNotes.length > 0 ? truncationNotes.join("; ") : undefined
+    email_threads: emailThreads,
+    slack_messages: slackMessages,
+    workflow_runs_recent: workflowRunsRecent
   };
 }

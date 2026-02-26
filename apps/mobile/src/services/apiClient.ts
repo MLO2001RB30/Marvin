@@ -232,6 +232,36 @@ export function createApiClient({ userId, accessToken }: ApiClientOptions) {
         `/v1/assistant/${userId}/chats/${chatId}/messages`,
         { method: "GET" },
         accessToken
+      ),
+    replyEmail: (threadId: string, body: string) =>
+      request<{ success: boolean; error?: string }>(
+        `/v1/reply/${userId}/email`,
+        { method: "POST", body: JSON.stringify({ threadId, body }) },
+        accessToken
+      ),
+    replySlack: (channelId: string, text: string, threadTs?: string) =>
+      request<{ success: boolean; error?: string }>(
+        `/v1/reply/${userId}/slack`,
+        { method: "POST", body: JSON.stringify({ channelId, text, threadTs }) },
+        accessToken
+      ),
+    getSuggestions: () =>
+      request<{ suggestions: Array<{ id: string; type: string; title: string; body: string; actionType?: string; itemId?: string; provider?: string }> }>(
+        `/v1/suggestions/${userId}`,
+        { method: "GET" },
+        accessToken
+      ),
+    getTier: () =>
+      request<{ tier: string; features: string[] }>(
+        `/v1/account/${userId}/tier`,
+        { method: "GET" },
+        accessToken
+      ),
+    registerPushToken: (token: string, platform: string) =>
+      request<{ success: boolean }>(
+        `/v1/notifications/${userId}/register`,
+        { method: "POST", body: JSON.stringify({ token, platform }) },
+        accessToken
       )
   };
 }

@@ -72,6 +72,10 @@ interface AppStateValue {
   refreshAssistantAnswer: () => Promise<void>;
   userTimezone: string;
   setUserTimezone: (timezone: string) => Promise<void>;
+  suggestions: Array<{ id: string; type: string; title: string; body: string; actionType?: string; itemId?: string; provider?: string }>;
+  replyToEmail: (threadId: string, body: string) => Promise<{ success: boolean }>;
+  replyToSlack: (channelId: string, text: string, threadTs?: string) => Promise<{ success: boolean }>;
+  userTier: string;
 }
 
 const consentProviders: IntegrationProvider[] = [
@@ -119,6 +123,8 @@ export function AppStateProvider({
   const [userTimezone, setUserTimezoneState] = useState<string>(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone
   );
+  const [suggestions, setSuggestions] = useState<AppStateValue["suggestions"]>([]);
+  const [userTier, setUserTier] = useState("free");
 
   const CACHE_KEY = `marvin:appCache:${userId}`;
 
@@ -219,6 +225,9 @@ export function AppStateProvider({
       setUserTimezoneState(profileResponse.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
 
       void persistCache(latestContextResponse.snapshot, itemsResponse.items, integrationsResponse.integrations);
+
+      void api.getSuggestions().then((r) => setSuggestions(r.suggestions)).catch(() => {});
+      void api.getTier().then((r) => setUserTier(r.tier)).catch(() => {});
 
       setIsLoading(false);
 
@@ -488,7 +497,15 @@ export function AppStateProvider({
         setAssistantReferences(response.contextReferences ?? null);
       },
       userTimezone,
-      setUserTimezone
+      setUserTimezone,
+      suggestions,
+      replyToEmail: async (threadId: string, body: string) => {
+        return api.replyEmail(threadId, body);
+      },
+      replyToSlack: async (channelId: string, text: string, threadTs?: string) => {
+        return api.replySlack(channelId, text, threadTs);
+      },
+      userTier
     }),
     [
       isLoading,
@@ -515,6 +532,8 @@ export function AppStateProvider({
       appendAssistantMessages,
       userTimezone,
       setUserTimezone,
+      suggestions,
+      userTier,
       api
     ]
   );

@@ -175,3 +175,57 @@ export async function syncGmailForUser(userId: string): Promise<number> {
 
   return items.length;
 }
+
+export async function sendGmailReply(
+  userId: string,
+  threadId: string,
+  body: string
+): Promise<{ success: boolean; error?: string }> {
+  const token = await getGoogleAccessToken(userId);
+  if (!token) return { success: false, error: "Gmail not connected" };
+
+  const rawId = threadId.replace(/^gmail-[^-]+-/, "");
+  const parts = rawId.split(":");
+  const msgId = parts[1] ?? parts[0];
+
+  try {
+    const msgRes = await gmailApiGet(token, `/messages/${msgId}`, { format: "metadata" }) as {
+      payload?: { headers?: Array<{ name: string; value: string }> };
+      threadId?: string;
+    };
+
+    const headers = msgRes.payload?.headers ?? [];
+    const to = headers.find((h) => h.name.toLowerCase() === "from")?.value ?? "";
+    const subject = headers.find((h) => h.name.toLowerCase() === "subject")?.value ?? "";
+    const messageId = headers.find((h) => h.name.toLowerCase() === "message-id")?.value ?? "";
+
+    const raw = [
+      `To: ${to}`,
+      `Subject: Re: ${subject}`,
+      `In-Reply-To: ${messageId}`,
+      `References: ${messageId}`,
+      "",
+      body
+    ].join("\r\n");
+
+    const encoded = Buffer.from(raw).toString("base64url");
+
+    const sendUrl = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages/send");
+    const res = await fetch(sendUrl.toString(), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ raw: encoded, threadId: msgRes.threadId ?? parts[0] })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      return { success: false, error: `Gmail API ${res.status}: ${errText.slice(0, 100)}` };
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Send failed" };
+  }
+}

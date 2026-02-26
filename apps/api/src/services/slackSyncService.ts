@@ -273,3 +273,33 @@ export async function resolveSlackUserNames(
   }
   return map;
 }
+
+export async function sendSlackReply(
+  userId: string,
+  channelId: string,
+  text: string,
+  threadTs?: string
+): Promise<{ success: boolean; error?: string }> {
+  const token = await getSlackAccessToken(userId);
+  if (!token) return { success: false, error: "Slack not connected" };
+
+  try {
+    const body: Record<string, string> = { channel: channelId, text };
+    if (threadTs) body.thread_ts = threadTs;
+
+    const res = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+
+    const data = (await res.json()) as { ok: boolean; error?: string };
+    if (!data.ok) return { success: false, error: data.error ?? "Slack API error" };
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Send failed" };
+  }
+}

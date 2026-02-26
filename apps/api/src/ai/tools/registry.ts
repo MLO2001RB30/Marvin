@@ -1,56 +1,13 @@
-import type { ExternalItem } from "@pia/shared";
 import type { OpenAITool } from "../llm/client";
 
-import { listExternalItems } from "../../services/integrationService";
-import { syncGoogleCalendarForUser } from "../../services/googleCalendarSyncService";
-import { listWorkflows, getWorkflowRunById } from "../../services/workflowService";
+import { listWorkflows } from "../../services/workflowService";
 import { executeWorkflow } from "../../services/orchestrationService";
 import { createCalendarEvent } from "../../services/googleCalendarSyncService";
-import { getSupabaseClient } from "../../services/supabaseClient";
+import { sendGmailReply } from "../../services/gmailSyncService";
+import { sendSlackReply } from "../../services/slackSyncService";
 
 export function getAssistantTools(userTimezone: string): OpenAITool[] {
   return [
-    {
-      type: "function",
-      function: {
-        name: "get_calendar_day",
-        description: "Get calendar events for a specific date. Syncs calendar if needed.",
-        parameters: {
-          type: "object",
-          properties: {
-            date: { type: "string", description: "Date in YYYY-MM-DD format" }
-          },
-          required: ["date"]
-        }
-      }
-    },
-    {
-      type: "function",
-      function: {
-        name: "list_unanswered_email_threads",
-        description: "List email threads that need a reply.",
-        parameters: {
-          type: "object",
-          properties: {
-            limit: { type: "number", description: "Max number of threads to return", default: 10 }
-          }
-        }
-      }
-    },
-    {
-      type: "function",
-      function: {
-        name: "get_email_thread",
-        description: "Get metadata and last messages for an email thread (redacted).",
-        parameters: {
-          type: "object",
-          properties: {
-            thread_id: { type: "string", description: "Email thread ID" }
-          },
-          required: ["thread_id"]
-        }
-      }
-    },
     {
       type: "function",
       function: {
@@ -71,14 +28,6 @@ export function getAssistantTools(userTimezone: string): OpenAITool[] {
     {
       type: "function",
       function: {
-        name: "list_workflows",
-        description: "List the user's workflows.",
-        parameters: { type: "object", properties: {} }
-      }
-    },
-    {
-      type: "function",
-      function: {
         name: "run_workflow",
         description: "Execute a workflow by ID.",
         parameters: {
@@ -93,40 +42,31 @@ export function getAssistantTools(userTimezone: string): OpenAITool[] {
     {
       type: "function",
       function: {
-        name: "get_workflow_run",
-        description: "Get details of a workflow run.",
+        name: "reply_email",
+        description: "Send a reply to a Gmail thread.",
         parameters: {
           type: "object",
           properties: {
-            run_id: { type: "string", description: "Workflow run ID" }
+            thread_id: { type: "string", description: "Gmail thread ID from context envelope" },
+            body: { type: "string", description: "Reply text" }
           },
-          required: ["run_id"]
+          required: ["thread_id", "body"]
         }
       }
     },
     {
       type: "function",
       function: {
-        name: "get_health_summary",
-        description: "Get health data summary for a date range.",
+        name: "reply_slack",
+        description: "Send a reply to a Slack message.",
         parameters: {
           type: "object",
           properties: {
-            date_range: { type: "string", description: "e.g. 'today' or 'last_7_days'" }
-          }
-        }
-      }
-    },
-    {
-      type: "function",
-      function: {
-        name: "get_weather_forecast",
-        description: "Get weather forecast.",
-        parameters: {
-          type: "object",
-          properties: {
-            range: { type: "string", description: "e.g. 'today' or 'week'" }
-          }
+            channel_id: { type: "string", description: "Slack channel ID" },
+            thread_ts: { type: "string", description: "Thread timestamp" },
+            text: { type: "string", description: "Reply text" }
+          },
+          required: ["channel_id", "text"]
         }
       }
     }
@@ -134,69 +74,11 @@ export function getAssistantTools(userTimezone: string): OpenAITool[] {
 }
 
 export function createToolExecutor(userId: string, timezone: string) {
-  let cachedItems: ExternalItem[] | null = null;
-
-  async function getItems(): Promise<ExternalItem[]> {
-    if (cachedItems) return cachedItems;
-    cachedItems = await listExternalItems(userId);
-    return cachedItems;
-  }
-
-  function invalidateItemCache() {
-    cachedItems = null;
-  }
-
   return async function executeTool(
     name: string,
     args: Record<string, unknown>
   ): Promise<string> {
     switch (name) {
-      case "get_calendar_day": {
-        await syncGoogleCalendarForUser(userId);
-        invalidateItemCache();
-        const items = await getItems();
-        const date = String(args.date ?? new Date().toISOString().slice(0, 10));
-        const calendarItems = items.filter(
-          (i) =>
-            i.provider === "google_calendar" &&
-            i.type === "calendar_event" &&
-            !i.sourceRef?.startsWith("initial-sync") &&
-            i.summary.startsWith(date)
-        );
-        return JSON.stringify(
-          calendarItems.map((i) => ({
-            id: i.id,
-            title: i.title,
-            summary: i.summary.slice(0, 200)
-          }))
-        );
-      }
-      case "list_unanswered_email_threads": {
-        const items = await getItems();
-        const limit = Math.min(Number(args.limit) || 10, 20);
-        const threads = items
-          .filter((i) => i.provider === "gmail" && i.type === "gmail_thread" && i.requiresReply)
-          .slice(0, limit)
-          .map((i) => ({
-            id: i.id,
-            title: i.title,
-            sender: i.sender,
-            summary: (i.summary ?? "").slice(0, 150)
-          }));
-        return JSON.stringify(threads);
-      }
-      case "get_email_thread": {
-        const threadId = String(args.thread_id ?? "");
-        const items = await getItems();
-        const item = items.find((i) => i.provider === "gmail" && (i.id === threadId || i.sourceRef === threadId));
-        if (!item) return JSON.stringify({ error: "Thread not found" });
-        return JSON.stringify({
-          id: item.id,
-          title: item.title,
-          sender: item.sender,
-          summary: (item.summary ?? "").slice(0, 500)
-        });
-      }
       case "create_calendar_event": {
         const created = await createCalendarEvent(userId, {
           title: String(args.title ?? "Event"),
@@ -208,12 +90,6 @@ export function createToolExecutor(userId: string, timezone: string) {
         return created
           ? JSON.stringify({ success: true, id: created.id, htmlLink: created.htmlLink })
           : JSON.stringify({ success: false, error: "Calendar not connected or sync failed" });
-      }
-      case "list_workflows": {
-        const workflows = await listWorkflows(userId);
-        return JSON.stringify(
-          workflows.map((w) => ({ id: w.id, name: w.name, enabled: w.enabled }))
-        );
       }
       case "run_workflow": {
         const workflowId = String(args.workflow_id ?? "");
@@ -227,54 +103,23 @@ export function createToolExecutor(userId: string, timezone: string) {
           digest_summary: run.digest?.summary
         });
       }
-      case "get_workflow_run": {
-        const runId = String(args.run_id ?? "");
-        const run = await getWorkflowRunById(userId, runId);
-        if (!run) return JSON.stringify({ error: "Run not found" });
-        return JSON.stringify({
-          id: run.id,
-          workflow_id: run.workflowId,
-          status: run.status,
-          digest_summary: run.digest?.summary
-        });
+      case "reply_email": {
+        const threadId = String(args.thread_id ?? "");
+        const body = String(args.body ?? "");
+        if (!threadId || !body) return JSON.stringify({ error: "thread_id and body required" });
+        const result = await sendGmailReply(userId, threadId, body);
+        return JSON.stringify(result);
       }
-      case "get_health_summary": {
-        const client = getSupabaseClient();
-        if (!client) return JSON.stringify({ error: "Database unavailable" });
-        const { data } = await client
-          .from("context_inputs")
-          .select("payload")
-          .eq("user_id", userId)
-          .eq("source", "healthkit")
-          .order("captured_at_iso", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        return JSON.stringify(data?.payload ?? { error: "No health data" });
-      }
-      case "get_weather_forecast": {
-        const client = getSupabaseClient();
-        if (!client) return JSON.stringify({ error: "Database unavailable" });
-        const { data } = await client
-          .from("context_inputs")
-          .select("payload")
-          .eq("user_id", userId)
-          .eq("source", "weatherkit")
-          .order("captured_at_iso", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        return JSON.stringify(data?.payload ?? { error: "No weather data" });
+      case "reply_slack": {
+        const channelId = String(args.channel_id ?? "");
+        const text = String(args.text ?? "");
+        const threadTs = args.thread_ts ? String(args.thread_ts) : undefined;
+        if (!channelId || !text) return JSON.stringify({ error: "channel_id and text required" });
+        const result = await sendSlackReply(userId, channelId, text, threadTs);
+        return JSON.stringify(result);
       }
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
   };
 }
-
-/** @deprecated Use createToolExecutor instead */
-export const executeTool = async (
-  userId: string,
-  name: string,
-  args: Record<string, unknown>
-): Promise<string> => {
-  return createToolExecutor(userId, "UTC")(name, args);
-};

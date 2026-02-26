@@ -220,7 +220,10 @@ export function BriefTabScreen() {
     runContextPipelineNow,
     integrationAccounts,
     externalItems,
-    isLoading
+    isLoading,
+    suggestions,
+    replyToEmail,
+    replyToSlack
   } = useAppState();
   const { user } = useAuthState();
   const { colors, spacing, typography, providerColors } = useTheme();
@@ -428,6 +431,43 @@ export function BriefTabScreen() {
               {whatChanged[0]}
             </Text>
           )}
+        </View>
+      )}
+
+      {suggestions.length > 0 && (
+        <View style={{ gap: spacing.xs }}>
+          {suggestions.map((s) => (
+            <Pressable
+              key={s.id}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.sm,
+                backgroundColor: colors.bgSurface,
+                borderRadius: 14,
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm,
+                borderWidth: 1,
+                borderColor: colors.accentGoldTint,
+                borderLeftWidth: 3,
+                borderLeftColor: colors.accentGold
+              }}
+            >
+              <Feather
+                name={s.type === "reply_overdue" ? "alert-circle" : s.type === "meeting_prep" ? "calendar" : "info"}
+                size={16}
+                color={colors.accentGold}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
+                  {s.title}
+                </Text>
+                <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.xs }} numberOfLines={1}>
+                  {s.body}
+                </Text>
+              </View>
+            </Pressable>
+          ))}
         </View>
       )}
 
@@ -779,7 +819,14 @@ export function BriefTabScreen() {
                     onPress={() => {
                       if (!replyText.trim()) return;
                       triggerHaptic();
+                      const text = replyText.trim();
                       setReplyText("");
+                      if (selectedItem.provider === "gmail") {
+                        void replyToEmail(selectedItem.id, text);
+                      } else if (selectedItem.provider === "slack" && selectedItem.sourceRef) {
+                        const parts = selectedItem.sourceRef.split(":");
+                        void replyToSlack(parts[0], text, parts[1]);
+                      }
                       setItemStatus(selectedItem.id, "done");
                       setSelectedItem(null);
                     }}

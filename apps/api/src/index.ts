@@ -25,7 +25,8 @@ import {
 import { syncGmailForUser } from "./services/gmailSyncService";
 import { syncGoogleCalendarForUser } from "./services/googleCalendarSyncService";
 import { syncGoogleDriveForUser } from "./services/googleDriveSyncService";
-import { resolveSlackUserNames, syncSlackForUser } from "./services/slackSyncService";
+import { resolveSlackUserNames, sendSlackReply, syncSlackForUser } from "./services/slackSyncService";
+import { sendGmailReply } from "./services/gmailSyncService";
 import { executeWorkflow } from "./services/orchestrationService";
 import {
   addWorkflowRun,
@@ -532,6 +533,129 @@ app.get("/v1/assistant/:userId/chats/:chatId/messages", async (req, res) => {
   const { userId, chatId } = req.params;
   const messages = await listAssistantChatMessages(userId, chatId);
   res.json({ chatId, messages });
+});
+
+// #6: Proactive suggestions
+app.get("/v1/suggestions/:userId", async (req, res) => {
+  const { generateSmartSuggestions } = await import("./services/suggestionsService");
+  const [items, integrations] = await Promise.all([
+    listExternalItems(req.params.userId),
+    listIntegrationAccounts(req.params.userId)
+  ]);
+  const suggestions = generateSmartSuggestions(items, integrations);
+  res.json({ suggestions });
+});
+
+// #2: Push notification registration
+app.post("/v1/notifications/:userId/register", async (req, res) => {
+  const { token, platform } = req.body as { token?: string; platform?: string };
+  if (!token) {
+    res.status(400).json({ error: "token required" });
+    return;
+  }
+  const { registerPushToken } = await import("./services/notificationService");
+  await registerPushToken(req.params.userId, token, platform ?? "ios");
+  res.json({ success: true });
+});
+
+// #3: Direct reply endpoints
+app.post("/v1/reply/:userId/email", async (req, res) => {
+  const { threadId, body } = req.body as { threadId?: string; body?: string };
+  if (!threadId || !body) {
+    res.status(400).json({ error: "threadId and body required" });
+    return;
+  }
+  const result = await sendGmailReply(req.params.userId, threadId, body);
+  res.json(result);
+});
+
+app.post("/v1/reply/:userId/slack", async (req, res) => {
+  const { channelId, text, threadTs } = req.body as { channelId?: string; text?: string; threadTs?: string };
+  if (!channelId || !text) {
+    res.status(400).json({ error: "channelId and text required" });
+    return;
+  }
+  const result = await sendSlackReply(req.params.userId, channelId, text, threadTs);
+  res.json(result);
+});
+
+// #4: Widget data endpoint (lightweight, for iOS/Android widgets)
+app.get("/v1/widget/:userId", async (req, res) => {
+  const [snapshot, items] = await Promise.all([
+    getLatestDailyContext(req.params.userId),
+    listExternalItems(req.params.userId)
+  ]);
+  const outstanding = items.filter((i) => i.isOutstanding);
+  const needsReply = outstanding.filter((i) => i.requiresReply);
+  const calendarToday = items
+    .filter((i) => i.provider === "google_calendar" && i.type === "calendar_event")
+    .filter((i) => {
+      const m = i.summary?.match(/^([\d-]+)/);
+      return m && m[1] === new Date().toISOString().slice(0, 10);
+    });
+  const nextEvent = calendarToday[0];
+  res.json({
+    outstandingCount: outstanding.length,
+    needsReplyCount: needsReply.length,
+    nextEvent: nextEvent ? { title: nextEvent.title, time: nextEvent.summary?.match(/T(\d{2}:\d{2})/)?.[1] } : null,
+    topPriority: snapshot?.topBlockers?.[0] ?? null,
+    lastSyncIso: snapshot?.generatedAtIso ?? null
+  });
+});
+
+// #5: Tier check endpoint
+app.get("/v1/account/:userId/tier", async (req, res) => {
+  const client = getSupabaseClient();
+  if (!client) {
+    res.json({ tier: "free", features: ["brief", "sync", "triage"] });
+    return;
+  }
+  const { data } = await client
+    .from("user_profiles")
+    .select("tier")
+    .eq("user_id", req.params.userId)
+    .maybeSingle();
+  const tier = data?.tier ?? "free";
+  const features = tier === "pro"
+    ? ["brief", "sync", "triage", "assistant", "workflows", "reply", "team"]
+    : ["brief", "sync", "triage"];
+  res.json({ tier, features });
+});
+
+// #8: Team context endpoint
+app.get("/v1/team/:teamId/brief", async (req, res) => {
+  const client = getSupabaseClient();
+  if (!client) {
+    res.json({ members: [], totalOutstanding: 0 });
+    return;
+  }
+  const { data: members } = await client
+    .from("user_profiles")
+    .select("user_id, display_name, timezone")
+    .eq("team_id", req.params.teamId);
+
+  if (!members || members.length === 0) {
+    res.json({ members: [], totalOutstanding: 0 });
+    return;
+  }
+
+  const memberBriefs = await Promise.all(
+    members.map(async (m) => {
+      const snapshot = await getLatestDailyContext(m.user_id);
+      return {
+        userId: m.user_id,
+        displayName: m.display_name ?? "Team member",
+        outstandingCount: snapshot?.outstandingItems?.length ?? 0,
+        topBlocker: snapshot?.topBlockers?.[0] ?? null,
+        lastSyncIso: snapshot?.generatedAtIso ?? null
+      };
+    })
+  );
+
+  res.json({
+    members: memberBriefs,
+    totalOutstanding: memberBriefs.reduce((sum, m) => sum + m.outstandingCount, 0)
+  });
 });
 
 app.listen(env.PORT, () => {
