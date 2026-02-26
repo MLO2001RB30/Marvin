@@ -212,7 +212,8 @@ export type AssistantDisplayType =
   | "text"
   | "items_list"
   | "calendar_view"
-  | "action_result";
+  | "action_result"
+  | "digest";
 
 export interface DisplayItem {
   provider: IntegrationProvider;
@@ -233,6 +234,17 @@ export interface DisplayCalendarEvent {
   organizer?: string;
 }
 
+export interface DigestPriority {
+  title: string;
+  why: string;
+  next_step: string;
+}
+
+export interface DigestRisk {
+  title: string;
+  severity: "high" | "med" | "low";
+}
+
 export interface StructuredAssistantResponse {
   display_type: AssistantDisplayType;
   summary: string;
@@ -241,6 +253,11 @@ export interface StructuredAssistantResponse {
   action_status?: "success" | "failed";
   action_description?: string;
   recommended_actions?: RecommendedAction[];
+  headline?: string;
+  top_priorities?: DigestPriority[];
+  schedule?: DisplayCalendarEvent[];
+  key_risks?: DigestRisk[];
+  coaching_note?: string;
 }
 
 export interface AssistantAnswer {

@@ -308,6 +308,9 @@ export function BriefTabScreen() {
   const openItemsCardHeight = Math.round(screenHeight * 0.75);
 
   const headline = dailyBrief?.headline ?? latestContext?.summary;
+  const briefPriorities = dailyBrief?.top_priorities ?? [];
+  const briefSchedule = dailyBrief?.schedule ?? [];
+  const briefNote = dailyBrief?.note;
 
   if (isLoading && !latestContext && externalItems.length === 0) {
     return <SkeletonBrief />;
@@ -342,6 +345,72 @@ export function BriefTabScreen() {
           ) : undefined
         }
       />
+
+      {/* Intelligence Hero — LLM-generated daily brief */}
+      {(briefPriorities.length > 0 || briefNote) && (
+        <View
+          style={{
+            backgroundColor: colors.bgSurface,
+            borderRadius: 20,
+            padding: spacing.lg,
+            gap: spacing.md,
+            borderWidth: 1,
+            borderColor: colors.accentGoldTint,
+            borderLeftWidth: 3,
+            borderLeftColor: colors.accentGold
+          }}
+        >
+          {briefPriorities.length > 0 && (
+            <View style={{ gap: spacing.sm }}>
+              <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
+                Marvin's priorities for today
+              </Text>
+              {briefPriorities.slice(0, 3).map((p, idx) => (
+                <View
+                  key={idx}
+                  style={{
+                    borderLeftWidth: 2,
+                    borderLeftColor: idx === 0 ? colors.danger : idx === 1 ? colors.accentGold : colors.textTertiary,
+                    paddingLeft: spacing.sm,
+                    gap: 1
+                  }}
+                >
+                  <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
+                    {p.title}
+                  </Text>
+                  <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.xs }}>
+                    {p.why}
+                  </Text>
+                  <Text style={{ color: colors.accentGold, fontSize: typography.sizes.xs }}>
+                    → {p.next_step}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {briefSchedule.length > 0 && (
+            <View style={{ gap: spacing.xs }}>
+              <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
+                Schedule
+              </Text>
+              {briefSchedule.slice(0, 4).map((ev, idx) => (
+                <Text key={idx} style={{ color: colors.textSecondary, fontSize: typography.sizes.xs }}>
+                  {ev.start} — {ev.title}
+                </Text>
+              ))}
+            </View>
+          )}
+
+          {briefNote && (
+            <View style={{ backgroundColor: colors.accentGoldTint, borderRadius: 10, padding: spacing.sm }}>
+              <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.xs, lineHeight: 18 }}>
+                {briefNote}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {(calendarToday.length > 0 || needsReply.length > 0 || topBlockers.length > 0) && (
         <View

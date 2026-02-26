@@ -544,11 +544,145 @@ function TextRenderer({ structured, colors, typography, spacing, onAction }: Ren
   );
 }
 
+function DigestRenderer({ structured, colors, typography, spacing, onAction }: RendererProps) {
+  return (
+    <View style={{ gap: spacing.md }}>
+      {/* Headline */}
+      {structured.headline && (
+        <Text
+          style={{
+            color: colors.accentGold,
+            fontSize: typography.sizes.lg,
+            fontWeight: "700",
+            lineHeight: typography.sizes.lg * 1.4
+          }}
+        >
+          {sanitize(structured.headline)}
+        </Text>
+      )}
+
+      {/* Summary */}
+      <Text
+        style={{
+          color: colors.textPrimary,
+          fontSize: typography.sizes.md,
+          lineHeight: typography.sizes.md * 1.5
+        }}
+      >
+        {sanitize(structured.summary)}
+      </Text>
+
+      {/* Top Priorities */}
+      {structured.top_priorities && structured.top_priorities.length > 0 && (
+        <View style={{ gap: spacing.xs }}>
+          <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
+            Top priorities
+          </Text>
+          {structured.top_priorities.map((p, idx) => (
+            <View
+              key={idx}
+              style={{
+                borderLeftWidth: 3,
+                borderLeftColor: idx === 0 ? colors.danger : idx === 1 ? colors.accentGold : colors.textTertiary,
+                paddingLeft: spacing.sm,
+                gap: 2
+              }}
+            >
+              <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md, fontWeight: "600" }}>
+                {sanitize(p.title)}
+              </Text>
+              <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}>
+                {sanitize(p.why)}
+              </Text>
+              <Text style={{ color: colors.accentGold, fontSize: typography.sizes.sm }}>
+                → {sanitize(p.next_step)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Schedule */}
+      {structured.schedule && structured.schedule.length > 0 && (
+        <View style={{ gap: spacing.xs }}>
+          <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
+            Today's schedule
+          </Text>
+          {structured.schedule.map((event, idx) => (
+            <View key={idx} style={{ flexDirection: "row", gap: spacing.sm, alignItems: "center" }}>
+              <Text style={{ color: colors.accentGold, fontSize: typography.sizes.sm, fontWeight: "600", width: 44 }}>
+                {event.start}
+              </Text>
+              <View style={{ width: 2, height: 16, backgroundColor: colors.accentGold, borderRadius: 1, opacity: 0.4 }} />
+              <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm, flex: 1 }} numberOfLines={1}>
+                {sanitize(event.title)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Key Risks */}
+      {structured.key_risks && structured.key_risks.length > 0 && (
+        <View style={{ gap: spacing.xs }}>
+          <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
+            Risks
+          </Text>
+          {structured.key_risks.map((risk, idx) => (
+            <View key={idx} style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+              <UrgencyDot urgency={risk.severity} colors={colors} />
+              <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm, flex: 1 }}>
+                {sanitize(risk.title)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Coaching Note */}
+      {structured.coaching_note && (
+        <View
+          style={{
+            backgroundColor: colors.accentGoldTint,
+            borderRadius: 12,
+            padding: spacing.sm,
+            flexDirection: "row",
+            gap: spacing.xs,
+            alignItems: "flex-start"
+          }}
+        >
+          <Feather name="info" size={14} color={colors.accentGold} style={{ marginTop: 2 }} />
+          <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm, flex: 1, lineHeight: typography.sizes.sm * 1.5 }}>
+            {sanitize(structured.coaching_note)}
+          </Text>
+        </View>
+      )}
+
+      {/* Actions */}
+      {structured.recommended_actions && structured.recommended_actions.length > 0 && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>
+          {structured.recommended_actions.map((action, idx) => (
+            <ActionChip
+              key={idx}
+              action={action}
+              colors={colors}
+              typography={typography}
+              spacing={spacing}
+              onPress={onAction ? () => onAction(action) : undefined}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 const RENDERERS: Record<AssistantDisplayType, React.FC<RendererProps>> = {
   items_list: ItemsListRenderer,
   calendar_view: CalendarViewRenderer,
   action_result: ActionResultRenderer,
-  text: TextRenderer
+  text: TextRenderer,
+  digest: DigestRenderer
 };
 
 export function StructuredMessageRenderer({

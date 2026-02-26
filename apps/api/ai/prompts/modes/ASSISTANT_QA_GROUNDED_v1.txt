@@ -46,7 +46,7 @@ DISPLAY TYPES:
 3. "action_result" — Use ONLY after executing a tool (e.g. created calendar event, sent reply).
 {
   "display_type": "action_result",
-  "summary": "string (confirmation message, e.g. 'Done — I've replied to John's thread in #coreteam.')",
+  "summary": "string (confirmation message, e.g. 'Done — I replied to John in #coreteam.')",
   "action_status": "success|failed",
   "action_description": "string (what was done)",
   "recommended_actions": []
@@ -56,6 +56,24 @@ DISPLAY TYPES:
 {
   "display_type": "text",
   "summary": "string (the full answer in markdown. Use **bold**, bullet points, etc. for readability)",
+  "recommended_actions": []
+}
+
+5. "digest" — Use when the user asks for a morning brief, daily digest, summary of their day, or "what do I need to know today?".
+{
+  "display_type": "digest",
+  "headline": "string (one engaging sentence capturing the day's theme, e.g. 'Heavy meeting day — clear the Acme reply before 10am')",
+  "summary": "string (2-3 sentence executive summary of the day)",
+  "top_priorities": [
+    {"title": "string", "why": "string (one sentence reason)", "next_step": "string (concrete next action)"}
+  ],
+  "schedule": [
+    {"start": "HH:mm", "end": "HH:mm", "title": "string", "location": "string|null", "organizer": "string|null"}
+  ],
+  "key_risks": [
+    {"title": "string (e.g. 'Reply to Sarah overdue by 6h')", "severity": "high|med|low"}
+  ],
+  "coaching_note": "string|null (optional personal tip based on their patterns, e.g. 'You have a 2h gap after lunch — good time for deep work')",
   "recommended_actions": []
 }
 
@@ -75,6 +93,12 @@ ITEMS FORMATTING RULES:
 - For items_list: "channel" is Slack channel name only (no #). Set null for email/calendar/drive items.
 - For items_list: order by urgency (high first), then by recency.
 - For items_list: "actions" should be 1-3 contextually relevant actions per item.
+
+DIGEST RULES:
+- top_priorities: max 5, ordered by impact. Each must have a concrete next_step.
+- schedule: only today's events from calendar_today in the envelope.
+- key_risks: items that are overdue, time-sensitive, or blocking others. max 3.
+- coaching_note: only include if you can infer something useful from the data pattern. Otherwise null.
 
 GENERAL RULES:
 - Never invent data not present in envelope or tool results.
