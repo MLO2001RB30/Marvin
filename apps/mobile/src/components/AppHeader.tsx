@@ -1,8 +1,28 @@
 import { Pressable, Text, View } from "react-native";
-
 import { Feather } from "@expo/vector-icons";
 
 import { useTheme } from "../theme/ThemeProvider";
+
+function GradientBar() {
+  const { colors, colorScheme } = useTheme();
+  const gradientColor = colorScheme === "dark" ? "rgba(26,26,28," : "rgba(245,245,247,";
+  return (
+    <View
+      style={{
+        position: "absolute",
+        top: 0,
+        left: -28,
+        right: -28,
+        height: 80,
+        zIndex: -1
+      }}
+    >
+      <View style={{ flex: 1, backgroundColor: `${gradientColor}0.95)` }} />
+      <View style={{ height: 20, backgroundColor: `${gradientColor}0.6)` }} />
+      <View style={{ height: 10, backgroundColor: `${gradientColor}0.2)` }} />
+    </View>
+  );
+}
 
 export function AppHeader({
   title,
@@ -10,7 +30,8 @@ export function AppHeader({
   compact,
   showLiveIndicator,
   onBack,
-  backLabel
+  backLabel,
+  rightElement
 }: {
   title: string;
   subtitle?: string;
@@ -18,6 +39,7 @@ export function AppHeader({
   showLiveIndicator?: boolean;
   onBack?: () => void;
   backLabel?: string;
+  rightElement?: React.ReactNode;
 }) {
   const { colors, spacing, typography } = useTheme();
   const titleSize = compact ? typography.sizes.xl : typography.sizes.hero;
@@ -35,29 +57,41 @@ export function AppHeader({
               }}
             />
           ) : null}
-          <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.sm }}>{subtitle}</Text>
+          <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.sm }} numberOfLines={1}>
+            {subtitle}
+          </Text>
         </View>
       ) : null}
       <Text
         style={{
           color: colors.textPrimary,
-          fontSize: titleSize
+          fontSize: titleSize,
+          fontWeight: compact ? "600" : "400",
+          letterSpacing: compact ? -0.3 : -0.5
         }}
       >
         {title}
       </Text>
     </>
   );
-  if (onBack) {
-    return (
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }}>
-        <View style={{ flex: 1, gap: spacing.xs }}>{content}</View>
-        <Pressable onPress={onBack} style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
-          <Feather name="chevron-left" size={20} color={colors.accentGold} />
-          <Text style={{ color: colors.accentGold, fontSize: typography.sizes.md }}>{backLabel ?? "Back"}</Text>
-        </Pressable>
-      </View>
-    );
-  }
-  return <View style={{ gap: spacing.xs }}>{content}</View>;
+
+  return (
+    <View style={{ position: "relative", zIndex: 1 }}>
+      <GradientBar />
+      {onBack ? (
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }}>
+          <View style={{ flex: 1, gap: spacing.xs }}>{content}</View>
+          <Pressable onPress={onBack} style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+            <Feather name="chevron-left" size={20} color={colors.accentGold} />
+            <Text style={{ color: colors.accentGold, fontSize: typography.sizes.md }}>{backLabel ?? "Back"}</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" }}>
+          <View style={{ flex: 1, gap: spacing.xs }}>{content}</View>
+          {rightElement}
+        </View>
+      )}
+    </View>
+  );
 }

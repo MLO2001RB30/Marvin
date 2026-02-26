@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
+  Animated,
+  Easing,
   Image,
   ImageSourcePropType,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -28,6 +31,9 @@ function triggerHaptic() {
 
 import { AppHeader } from "../../components/AppHeader";
 import { EmptyStateCard } from "../../components/EmptyStateCard";
+import { ProgressRing } from "../../components/ProgressRing";
+import { SenderAvatar } from "../../components/SenderAvatar";
+import { SkeletonBrief } from "../../components/Skeleton";
 import { useItemStatuses } from "../../hooks/useItemStatuses";
 import { ReviewItemsScreen, type OpenItem } from "../../screens/ReviewItemsScreen";
 import { useAppState } from "../../state/AppState";
@@ -153,6 +159,59 @@ function toOpenItem(
   };
 }
 
+function SwipeableCard({
+  children,
+  onSwipeRight,
+  onSwipeLeft
+}: {
+  children: React.ReactNode;
+  onSwipeRight?: () => void;
+  onSwipeLeft?: () => void;
+}) {
+  const { colors, spacing } = useTheme();
+  const translateX = useRef(new Animated.Value(0)).current;
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 15 && Math.abs(g.dy) < 20,
+      onPanResponderMove: (_, g) => {
+        translateX.setValue(Math.max(-80, Math.min(80, g.dx)));
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dx > 60 && onSwipeRight) {
+          Animated.timing(translateX, { toValue: 100, duration: 150, useNativeDriver: true }).start(() => {
+            onSwipeRight();
+            translateX.setValue(0);
+          });
+        } else if (g.dx < -60 && onSwipeLeft) {
+          Animated.timing(translateX, { toValue: -100, duration: 150, useNativeDriver: true }).start(() => {
+            onSwipeLeft();
+            translateX.setValue(0);
+          });
+        } else {
+          Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+        }
+      }
+    })
+  ).current;
+
+  return (
+    <View style={{ position: "relative", overflow: "hidden", borderRadius: 14 }}>
+      <View style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: 80, backgroundColor: colors.success + "30", borderRadius: 14, justifyContent: "center", paddingLeft: spacing.md }}>
+        <Feather name="check" size={20} color={colors.success} />
+      </View>
+      <View style={{ position: "absolute", top: 0, bottom: 0, right: 0, width: 80, backgroundColor: colors.info + "30", borderRadius: 14, justifyContent: "center", alignItems: "flex-end", paddingRight: spacing.md }}>
+        <Feather name="corner-up-left" size={20} color={colors.info} />
+      </View>
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={{ transform: [{ translateX }] }}
+      >
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
+
 export function BriefTabScreen() {
   const {
     latestContext,
@@ -160,10 +219,11 @@ export function BriefTabScreen() {
     setActiveTab,
     runContextPipelineNow,
     integrationAccounts,
-    externalItems
+    externalItems,
+    isLoading
   } = useAppState();
   const { user } = useAuthState();
-  const { colors, spacing, typography } = useTheme();
+  const { colors, spacing, typography, providerColors } = useTheme();
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<OpenItem | null>(null);
   const [doneFolderExpanded, setDoneFolderExpanded] = useState(false);
@@ -246,6 +306,10 @@ export function BriefTabScreen() {
 
   const headline = dailyBrief?.headline ?? latestContext?.summary;
 
+  if (isLoading && !latestContext && externalItems.length === 0) {
+    return <SkeletonBrief />;
+  }
+
   const calendarToday = externalItems
     .filter((i) => i.provider === "google_calendar" && i.type === "calendar_event")
     .filter((i) => {
@@ -269,6 +333,11 @@ export function BriefTabScreen() {
         subtitle={(headline ?? updatedLabel) || "Personal AI Assistant"}
         compact
         showLiveIndicator={updatedLabel === "Updated just now"}
+        rightElement={
+          allItems.length > 0 ? (
+            <ProgressRing done={doneItems.length} total={allItems.length} />
+          ) : undefined
+        }
       />
 
       {(calendarToday.length > 0 || needsReply.length > 0 || topBlockers.length > 0) && (
@@ -431,81 +500,84 @@ export function BriefTabScreen() {
                   </View>
                   <View style={{ height: stackHeight, position: "relative" }}>
                     {items.map((item, index) => {
-                      const logoSource = providerLogos[item.provider];
+                      const pColor = providerColors[item.provider] ?? colors.border;
                       const request = displaySlackText(item.title || item.summary || "");
                       const sender = item.sender ? displaySlackText(item.sender) : null;
                       const date = formatItemDate(item.dateIso);
                       const stackIndex = items.length - 1 - index;
                       const topOffset = CARD_HEIGHT * 0.2 * index;
                       return (
-                        <Pressable
+                        <View
                           key={item.id}
-                          onPress={() => {
-                            setSelectedItem(item);
-                            setSelectedItemFromDone(false);
-                          }}
-                          onLongPress={() => {
-                            setItemStatus(item.id, "done");
-                          }}
                           style={{
                             position: "absolute",
                             top: topOffset,
                             left: 0,
                             right: 0,
                             height: CARD_HEIGHT,
-                            zIndex: items.length - index,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            borderWidth: 1,
-                            borderColor: colors.border,
-                            borderRadius: 14,
-                            paddingVertical: spacing.sm,
-                            paddingHorizontal: spacing.md,
-                            backgroundColor: colors.bgSurface,
-                            gap: spacing.sm,
-                            shadowColor: "#000",
-                            shadowOffset: { width: 0, height: stackIndex * 2 },
-                            shadowOpacity: 0.08 + stackIndex * 0.02,
-                            shadowRadius: 4 + stackIndex,
-                            elevation: 2 + stackIndex
+                            zIndex: items.length - index
                           }}
                         >
-                          {logoSource ? (
-                            <Image
-                              source={logoSource}
-                              style={{ width: 28, height: 28, borderRadius: 8 }}
-                              resizeMode="contain"
-                            />
-                          ) : (
-                            <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: colors.border }} />
-                          )}
-                          <View style={{ flex: 1, minWidth: 0 }}>
-                            <Text
-                              style={{ color: colors.textPrimary, fontSize: typography.sizes.sm }}
-                              numberOfLines={3}
-                              ellipsizeMode="tail"
-                            >
-                              {request}
-                            </Text>
-                            <Text
-                              style={{ color: colors.textTertiary, fontSize: typography.sizes.xs }}
-                              numberOfLines={1}
-                            >
-                              {sender ?? "—"}
-                              {date ? ` · ${date}` : ""}
-                            </Text>
-                          </View>
-                          <Pressable
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              setItemStatus(item.id, "done");
-                            }}
-                            hitSlop={8}
-                            style={{ padding: spacing.xs }}
+                          <SwipeableCard
+                            onSwipeRight={() => setItemStatus(item.id, "done")}
+                            onSwipeLeft={() => setItemStatus(item.id, "reply")}
                           >
-                            <Feather name="check" size={16} color={colors.textTertiary} />
-                          </Pressable>
-                        </Pressable>
+                            <Pressable
+                              onPress={() => {
+                                setSelectedItem(item);
+                                setSelectedItemFromDone(false);
+                              }}
+                              onLongPress={() => setItemStatus(item.id, "done")}
+                              style={{
+                                height: CARD_HEIGHT,
+                                flexDirection: "row",
+                                alignItems: "center",
+                                borderWidth: 1,
+                                borderColor: colors.border,
+                                borderLeftWidth: 3,
+                                borderLeftColor: pColor,
+                                borderRadius: 14,
+                                paddingVertical: spacing.sm,
+                                paddingHorizontal: spacing.md,
+                                backgroundColor: colors.bgSurface,
+                                gap: spacing.sm,
+                                shadowColor: "#000",
+                                shadowOffset: { width: 0, height: stackIndex * 2 },
+                                shadowOpacity: 0.08 + stackIndex * 0.02,
+                                shadowRadius: 4 + stackIndex,
+                                elevation: 2 + stackIndex
+                              }}
+                            >
+                              <SenderAvatar sender={item.sender} provider={item.provider} size={28} />
+                              <View style={{ flex: 1, minWidth: 0 }}>
+                                <Text
+                                  style={{ color: colors.textPrimary, fontSize: typography.sizes.sm }}
+                                  numberOfLines={3}
+                                  ellipsizeMode="tail"
+                                >
+                                  {request}
+                                </Text>
+                                <Text
+                                  style={{ color: colors.textTertiary, fontSize: typography.sizes.xs }}
+                                  numberOfLines={1}
+                                >
+                                  {sender ?? "—"}
+                                  {date ? ` · ${date}` : ""}
+                                </Text>
+                              </View>
+                              <Pressable
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  setItemStatus(item.id, "done");
+                                }}
+                                hitSlop={8}
+                                style={{ padding: spacing.xs }}
+                              >
+                                <Feather name="check" size={16} color={colors.textTertiary} />
+                              </Pressable>
+                            </Pressable>
+                          </SwipeableCard>
+                        </View>
                       );
                     })}
                   </View>
@@ -608,37 +680,42 @@ export function BriefTabScreen() {
 
       <Modal
         visible={selectedItem != null}
-        animationType="fade"
+        animationType="slide"
         transparent
         onRequestClose={() => {
           setSelectedItem(null);
           setSelectedItemFromDone(false);
+          setReplyText("");
         }}
       >
         <Pressable
           style={{
             flex: 1,
-            backgroundColor: "rgba(0,0,0,0.6)",
-            justifyContent: "center",
-            padding: spacing.lg
+            backgroundColor: "rgba(0,0,0,0.4)",
+            justifyContent: "flex-end"
           }}
           onPress={() => {
             setSelectedItem(null);
             setSelectedItemFromDone(false);
+            setReplyText("");
           }}
         >
           {selectedItem && (
             <Pressable
               style={{
                 backgroundColor: colors.bgSurface,
-                borderRadius: 20,
+                borderTopLeftRadius: 20,
+                borderTopRightRadius: 20,
                 padding: spacing.lg,
+                paddingBottom: spacing.xl,
                 borderWidth: 1,
+                borderBottomWidth: 0,
                 borderColor: colors.border,
-                maxHeight: "85%"
+                maxHeight: "75%"
               }}
               onPress={(e) => e.stopPropagation()}
             >
+              <View style={{ alignSelf: "center", width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: spacing.md }} />
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.md }}>
                 {providerLogos[selectedItem.provider] ? (
                   <Image

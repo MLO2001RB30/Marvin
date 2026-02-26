@@ -221,8 +221,27 @@ export function AppShell() {
           }
         >
           {syncStatus ? (
-            <View style={{ alignItems: "center", paddingVertical: spacing.xs }}>
-              <Text style={{ color: colors.accentGold, fontSize: typography.sizes.xs }}>
+            <View style={{
+              alignItems: "center",
+              paddingVertical: spacing.sm,
+              flexDirection: "row",
+              justifyContent: "center",
+              gap: spacing.xs
+            }}>
+              {syncStatus !== "Done" && syncStatus !== "Sync failed" && (
+                <Feather name="refresh-cw" size={12} color={colors.accentGold} />
+              )}
+              {syncStatus === "Done" && (
+                <Feather name="check-circle" size={12} color={colors.success} />
+              )}
+              {syncStatus === "Sync failed" && (
+                <Feather name="alert-circle" size={12} color={colors.danger} />
+              )}
+              <Text style={{
+                color: syncStatus === "Done" ? colors.success : syncStatus === "Sync failed" ? colors.danger : colors.accentGold,
+                fontSize: typography.sizes.xs,
+                fontWeight: "500"
+              }}>
                 {syncStatus}
               </Text>
             </View>

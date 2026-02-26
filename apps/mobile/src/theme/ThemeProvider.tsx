@@ -7,6 +7,7 @@ type ColorScheme = "dark" | "light";
 
 interface ThemeContextValue {
   colors: typeof tokens.colors;
+  providerColors: typeof tokens.providerColors;
   spacing: typeof tokens.spacing;
   typography: typeof tokens.typography;
   radius: typeof tokens.radius;
@@ -17,6 +18,7 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue>({
   colors: tokens.colors,
+  providerColors: tokens.providerColors,
   spacing: tokens.spacing,
   typography: tokens.typography,
   radius: tokens.radius,
@@ -39,6 +41,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     <ThemeContext.Provider
       value={{
         colors,
+        providerColors: tokens.providerColors,
         spacing: tokens.spacing,
         typography: tokens.typography,
         radius: tokens.radius,

@@ -28,13 +28,26 @@ const lightColors: typeof darkColors = {
   danger: "#DC2626"
 };
 
+const providerColors = {
+  slack: "#4A154B",
+  gmail: "#EA4335",
+  google_drive: "#1A73E8",
+  google_calendar: "#4285F4",
+  onedrive: "#0078D4",
+  dropbox: "#0061FF",
+  healthkit: "#FF2D55",
+  weatherkit: "#5AC8FA",
+  linear: "#5E6AD2"
+};
+
 export const tokens = {
   colors: darkColors,
   lightColors,
   darkColors,
+  providerColors,
   typography: {
-    serif: "Times New Roman",
-    sans: "Inter",
+    serif: "Georgia",
+    sans: "System",
     sizes: {
       xs: 10,
       sm: 12,
@@ -43,6 +56,17 @@ export const tokens = {
       xl: 22,
       xxl: 32,
       hero: 40
+    },
+    weights: {
+      regular: "400" as const,
+      medium: "500" as const,
+      semibold: "600" as const,
+      bold: "700" as const
+    },
+    letterSpacing: {
+      tight: -0.5,
+      normal: 0,
+      wide: 0.5
     }
   },
   spacing: {
