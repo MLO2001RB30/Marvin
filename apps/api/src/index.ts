@@ -104,7 +104,9 @@ app.use("/v1", async (req, res, next) => {
       "metrics",
       "digest",
       "assistant",
-      "profile"
+      "profile",
+      "context-packages",
+      "search"
     ].includes(segments[0] ?? "")
   ) {
     routeUserId = segments[1] ?? null;
@@ -408,6 +410,57 @@ app.get("/v1/metrics/:userId", async (req, res) => {
   res.json({ metrics });
 });
 
+app.get("/v1/search/:userId", async (req, res) => {
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (!q) {
+    res.json({ results: [], query: "" });
+    return;
+  }
+  const client = getSupabaseClient();
+  if (!client) {
+    const items = await listExternalItems(req.params.userId);
+    const lower = q.toLowerCase();
+    const filtered = items.filter(
+      (i) =>
+        i.title.toLowerCase().includes(lower) ||
+        (i.summary ?? "").toLowerCase().includes(lower) ||
+        (i.sender ?? "").toLowerCase().includes(lower)
+    );
+    res.json({ results: filtered.slice(0, 20), query: q });
+    return;
+  }
+  const tsQuery = q.split(/\s+/).filter(Boolean).join(" & ");
+  const { data } = await client
+    .from("external_items")
+    .select("*")
+    .eq("user_id", req.params.userId)
+    .textSearch("search_fts", tsQuery, { type: "plain" })
+    .order("updated_at_iso", { ascending: false })
+    .limit(20);
+  const results = (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id,
+    provider: row.provider,
+    type: row.type,
+    sourceRef: row.source_ref,
+    title: row.title,
+    summary: row.summary,
+    sender: row.sender,
+    tags: row.tags ?? [],
+    requiresReply: Boolean(row.requires_action),
+    isOutstanding: row.status === "new" || row.status === "open",
+    createdAtIso: row.created_at_iso,
+    updatedAtIso: row.updated_at_iso,
+    bodyText: row.body_text
+  }));
+  res.json({ results, query: q });
+});
+
+app.get("/v1/context-packages/:userId", async (req, res) => {
+  const { listActiveContextPackages } = await import("./services/contextPackageService");
+  const packages = await listActiveContextPackages(req.params.userId);
+  res.json({ packages });
+});
+
 app.get("/v1/digest/:userId", async (req, res) => {
   const items = await listExternalItems(req.params.userId);
   const digest = buildOutstandingDigest(items);
@@ -593,7 +646,8 @@ app.post("/v1/assistant/:userId/query", async (req, res) => {
     role: "assistant",
     text: response.answer,
     attachments: response.attachmentsUsed ?? [],
-    contextReferences: response.contextReferences ?? []
+    contextReferences: response.contextReferences ?? [],
+    structured: response.structured
   });
   void logAssistantAudit(req.params.userId, payload.question, response, snapshot?.id ?? null);
   res.json({

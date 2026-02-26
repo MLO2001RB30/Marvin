@@ -1,4 +1,4 @@
-import type { AssistantChat, AssistantChatMessage, AssistantContextReference } from "@pia/shared";
+import type { AssistantChat, AssistantChatMessage, AssistantContextReference, StructuredAssistantResponse } from "@pia/shared";
 
 import { getSupabaseClient } from "./supabaseClient";
 
@@ -88,7 +88,8 @@ export async function listAssistantChatMessages(
     text: row.text,
     createdAtIso: row.created_at,
     attachments: row.attachments ?? [],
-    contextReferences: row.context_references ?? []
+    contextReferences: row.context_references ?? [],
+    structured: row.structured_json ?? undefined
   })) as AssistantChatMessage[];
 }
 
@@ -99,6 +100,7 @@ export async function appendAssistantChatMessage(params: {
   text: string;
   attachments?: unknown[];
   contextReferences?: AssistantContextReference[];
+  structured?: StructuredAssistantResponse;
 }): Promise<AssistantChatMessage> {
   const client = getSupabaseClient();
   const nowIso = new Date().toISOString();
@@ -110,7 +112,8 @@ export async function appendAssistantChatMessage(params: {
       text: params.text,
       createdAtIso: nowIso,
       attachments: params.attachments as AssistantChatMessage["attachments"],
-      contextReferences: params.contextReferences
+      contextReferences: params.contextReferences,
+      structured: params.structured
     };
   }
 
@@ -123,6 +126,7 @@ export async function appendAssistantChatMessage(params: {
       text: params.text,
       attachments: params.attachments ?? [],
       context_references: params.contextReferences ?? [],
+      structured_json: params.structured ?? null,
       created_at: nowIso
     })
     .select("*")
@@ -147,6 +151,7 @@ export async function appendAssistantChatMessage(params: {
     text: data.text,
     createdAtIso: data.created_at,
     attachments: data.attachments ?? [],
-    contextReferences: data.context_references ?? []
+    contextReferences: data.context_references ?? [],
+    structured: data.structured_json ?? undefined
   };
 }

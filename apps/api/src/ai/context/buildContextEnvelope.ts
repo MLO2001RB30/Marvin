@@ -4,6 +4,7 @@ import {
   listExternalItems,
   listIntegrationAccounts
 } from "../../services/integrationService";
+import { getSupabaseClient } from "../../services/supabaseClient";
 import { getLatestDailyContext } from "../../services/contextSnapshotService";
 import { listWorkflowRuns } from "../../services/workflowService";
 import { getUserTimezone } from "../../services/userProfileService";
@@ -80,6 +81,7 @@ export async function buildContextEnvelope(
     provider: i.provider,
     title: i.title,
     summary: (i.summary ?? "").slice(0, 200),
+    body_text: ((i as unknown as Record<string, unknown>).bodyText as string | undefined)?.slice(0, 500) ?? undefined,
     sender: i.sender,
     requires_reply: i.requiresReply,
     urgency: i.tags.includes("urgent") ? "high" : i.requiresReply ? "med" : "low"
@@ -140,6 +142,54 @@ export async function buildContextEnvelope(
         }
       : undefined);
 
+  let contactsContext: Array<{ name: string; providers: string[]; interaction_count: number; last_seen?: string }> = [];
+  try {
+    const client = getSupabaseClient();
+    if (client) {
+      const { data: contactRows } = await client
+        .from("contacts")
+        .select("id, display_name")
+        .eq("user_id", userId)
+        .limit(20);
+      if (contactRows && contactRows.length > 0) {
+        const contactIds = contactRows.map((c: Record<string, unknown>) => c.id as string);
+        const { data: identRows } = await client
+          .from("contact_identifiers")
+          .select("contact_id, provider")
+          .eq("user_id", userId)
+          .in("contact_id", contactIds);
+        const { data: itemContactRows } = await client
+          .from("item_contacts")
+          .select("contact_id, item_id, role")
+          .eq("user_id", userId)
+          .in("contact_id", contactIds);
+        const providersByContact = new Map<string, Set<string>>();
+        for (const row of identRows ?? []) {
+          const r = row as Record<string, unknown>;
+          const cid = r.contact_id as string;
+          if (!providersByContact.has(cid)) providersByContact.set(cid, new Set());
+          providersByContact.get(cid)!.add(r.provider as string);
+        }
+        const countByContact = new Map<string, number>();
+        for (const row of itemContactRows ?? []) {
+          const r = row as Record<string, unknown>;
+          const cid = r.contact_id as string;
+          countByContact.set(cid, (countByContact.get(cid) ?? 0) + 1);
+        }
+        contactsContext = contactRows
+          .map((c: Record<string, unknown>) => ({
+            name: c.display_name as string,
+            providers: [...(providersByContact.get(c.id as string) ?? [])],
+            interaction_count: countByContact.get(c.id as string) ?? 0
+          }))
+          .sort((a, b) => b.interaction_count - a.interaction_count)
+          .slice(0, 15);
+      }
+    }
+  } catch {
+    // Contact loading is best-effort
+  }
+
   return {
     metadata: {
       user_id: userId,
@@ -153,6 +203,7 @@ export async function buildContextEnvelope(
     calendar_today: calendarToday,
     email_threads: emailThreads,
     slack_messages: slackMessages,
-    workflow_runs_recent: workflowRunsRecent
-  };
+    workflow_runs_recent: workflowRunsRecent,
+    ...(contactsContext.length > 0 ? { contacts: contactsContext } : {})
+  } as ContextEnvelope;
 }

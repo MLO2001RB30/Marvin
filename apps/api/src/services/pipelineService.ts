@@ -84,6 +84,12 @@ export async function runDailyContextPipeline(userId: string): Promise<PipelineR
   await upsertDailyContext(snapshot);
   traces.push("pipeline.persist.complete");
 
+  void import("./itemClassificationService").then(({ classifyItemsWithLLM }) => {
+    void classifyItemsWithLLM(userId, items).then(() => {
+      traces.push("pipeline.classify.complete");
+    });
+  });
+
   void import("./notificationService").then(({ sendDailyBriefNotification }) => {
     const needsReply = outstanding.filter((i) => i.category === "reply_needed").length;
     void sendDailyBriefNotification(userId, outstanding.length, needsReply, topBlockers[0] ?? null);
