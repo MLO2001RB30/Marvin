@@ -28,6 +28,7 @@ import { AppState as RNAppState, Linking } from "react-native";
 
 import type { RootTabKey } from "../navigation/tabIA";
 import { createApiClient } from "../services/apiClient";
+import { storage } from "../services/storage";
 
 interface AppStateValue {
   isLoading: boolean;
@@ -130,10 +131,7 @@ export function AppStateProvider({
 
   const loadCachedState = useCallback(async () => {
     try {
-      const mod = require("@react-native-async-storage/async-storage");
-      const AsyncStorage = mod.default ?? mod;
-      if (!AsyncStorage?.getItem) return;
-      const raw = await AsyncStorage.getItem(CACHE_KEY);
+      const raw = await storage.getItem(CACHE_KEY);
       if (!raw) return;
       const cached = JSON.parse(raw) as {
         latestContext?: DailyContextSnapshot;
@@ -150,10 +148,7 @@ export function AppStateProvider({
 
   const persistCache = useCallback(async (ctx: DailyContextSnapshot | null, items: ExternalItem[], integrations: IntegrationAccount[]) => {
     try {
-      const mod = require("@react-native-async-storage/async-storage");
-      const AsyncStorage = mod.default ?? mod;
-      if (!AsyncStorage?.setItem) return;
-      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
+      await storage.setItem(CACHE_KEY, JSON.stringify({
         latestContext: ctx,
         externalItems: items.slice(0, 100),
         integrations

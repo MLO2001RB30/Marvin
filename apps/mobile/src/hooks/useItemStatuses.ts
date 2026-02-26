@@ -1,50 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { storage } from "../services/storage";
+
 export type ItemStatus = "done" | "still_due" | "reply" | null;
 
 const STORAGE_KEY_PREFIX = "marvin:itemStatuses:";
-
-const inMemoryStore: Record<string, string> = {};
-const inMemoryStorage = {
-  getItem: (key: string) => Promise.resolve(inMemoryStore[key] ?? null),
-  setItem: (key: string, value: string) => {
-    inMemoryStore[key] = value;
-    return Promise.resolve();
-  }
-};
-
-let _storage: { getItem: (k: string) => Promise<string | null>; setItem: (k: string, v: string) => Promise<void> } | null = null;
-
-function getStorage() {
-  if (_storage) return _storage;
-  try {
-    const mod = require("@react-native-async-storage/async-storage");
-    const AsyncStorage = mod.default ?? mod;
-    if (AsyncStorage?.getItem && AsyncStorage?.setItem) {
-      _storage = {
-        getItem: async (k) => {
-          try {
-            return await AsyncStorage.getItem(k);
-          } catch {
-            return inMemoryStorage.getItem(k);
-          }
-        },
-        setItem: async (k, v) => {
-          try {
-            await AsyncStorage.setItem(k, v);
-          } catch {
-            await inMemoryStorage.setItem(k, v);
-          }
-        }
-      };
-      return _storage;
-    }
-  } catch {
-    // Native module not ready (e.g. Expo Go, dev client before rebuild)
-  }
-  _storage = inMemoryStorage;
-  return _storage;
-}
 
 export function useItemStatuses(userId: string) {
   const [itemStatuses, setItemStatusesState] = useState<Record<string, ItemStatus>>({});
@@ -54,7 +14,7 @@ export function useItemStatuses(userId: string) {
 
   useEffect(() => {
     if (!storageKey) return;
-    getStorage()
+    storage
       .getItem(storageKey)
       .then((raw) => {
         if (raw) {
@@ -84,7 +44,7 @@ export function useItemStatuses(userId: string) {
               return rest;
             })();
         if (storageKey) {
-          getStorage().setItem(storageKey, JSON.stringify(next)).catch(() => {});
+          storage.setItem(storageKey, JSON.stringify(next)).catch(() => {});
         }
         return next;
       });
