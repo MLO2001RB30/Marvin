@@ -137,25 +137,23 @@ export function OnboardingWizard({
           <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.md, textAlign: "center" }}>
             Marvin answers questions about your day using real context from your connected tools.
           </Text>
-          <View style={{ gap: spacing.xs }}>
+          <View style={{ gap: spacing.sm }}>
             {DEMO_PROMPTS.map((prompt, idx) => (
               <View
                 key={idx}
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: spacing.sm,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: 14,
+                  alignSelf: idx % 2 === 0 ? "flex-end" : "flex-start",
+                  maxWidth: "85%",
+                  borderRadius: 18,
                   paddingHorizontal: spacing.md,
                   paddingVertical: spacing.sm,
-                  backgroundColor: colors.bgSurface
+                  backgroundColor: idx % 2 === 0 ? colors.accentGoldTint : colors.bgSurface,
+                  borderWidth: idx % 2 === 0 ? 0 : 1,
+                  borderColor: colors.border
                 }}
               >
-                <Feather name="message-circle" size={16} color={colors.accentGold} />
-                <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm, flex: 1 }}>
-                  "{prompt}"
+                <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm }}>
+                  {prompt}
                 </Text>
               </View>
             ))}

@@ -30,8 +30,6 @@ function triggerHaptic() {
 }
 
 import { AppHeader } from "../../components/AppHeader";
-import { EmptyStateCard } from "../../components/EmptyStateCard";
-import { ProgressRing } from "../../components/ProgressRing";
 import { SenderAvatar } from "../../components/SenderAvatar";
 import { SkeletonBrief } from "../../components/Skeleton";
 import { useItemStatuses } from "../../hooks/useItemStatuses";
@@ -604,23 +602,66 @@ export function BriefTabScreen() {
         {!hasOpenItems ? (
           <View style={{ paddingVertical: spacing.lg }}>
             {isFirstTime && !latestContext ? (
-              <EmptyStateCard
-                title="No open items yet"
-                body="Connect Gmail, Calendar, or Slack to see your items here. Or run a demo pipeline to preview."
-                actions={[
-                  { label: "Run demo pipeline", onPress: () => void runContextPipelineNow() },
-                  { label: "Connect integrations", onPress: () => setActiveTab("manage") }
-                ]}
-              />
+              <View style={{ alignItems: "center", gap: spacing.lg }}>
+                <Image source={require("../../../assets/images/Marvin_logo.png")} style={{ width: 56, height: 56, opacity: 0.8 }} resizeMode="contain" />
+                <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.lg, fontWeight: "600", textAlign: "center" }}>
+                  Marvin is ready to work for you
+                </Text>
+                <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, textAlign: "center", lineHeight: 20 }}>
+                  Connect your tools and Marvin will surface what needs your attention each day.
+                </Text>
+                <View style={{ gap: spacing.xs, width: "100%" }}>
+                  {[
+                    { label: "Gmail", icon: "mail" as const, onPress: () => setActiveTab("manage") },
+                    { label: "Google Calendar", icon: "calendar" as const, onPress: () => setActiveTab("manage") },
+                    { label: "Slack", icon: "message-square" as const, onPress: () => setActiveTab("manage") }
+                  ].map((item) => (
+                    <Pressable
+                      key={item.label}
+                      onPress={item.onPress}
+                      style={({ pressed }) => ({
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: spacing.sm,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        borderRadius: 14,
+                        paddingHorizontal: spacing.md,
+                        paddingVertical: spacing.sm,
+                        backgroundColor: colors.bgSurface,
+                        opacity: pressed ? 0.7 : 1
+                      })}
+                    >
+                      <Feather name={item.icon} size={20} color={colors.accentGold} />
+                      <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md, flex: 1 }}>
+                        Connect {item.label}
+                      </Text>
+                      <Feather name="chevron-right" size={16} color={colors.textTertiary} />
+                    </Pressable>
+                  ))}
+                </View>
+                <Pressable
+                  onPress={() => void runContextPipelineNow()}
+                  style={({ pressed }) => ({
+                    paddingVertical: spacing.xs,
+                    opacity: pressed ? 0.6 : 1
+                  })}
+                >
+                  <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.sm }}>
+                    or try with demo data
+                  </Text>
+                </Pressable>
+              </View>
             ) : (
-              <EmptyStateCard
-                title="No open items"
-                body="You're all caught up. New items from your connected apps will appear here."
-                actions={[
-                  { label: "Run context pipeline", onPress: () => void runContextPipelineNow() },
-                  { label: "Manage integrations", onPress: () => setActiveTab("manage") }
-                ]}
-              />
+              <View style={{ alignItems: "center", gap: spacing.md, paddingVertical: spacing.md }}>
+                <Feather name="check-circle" size={32} color={colors.success} />
+                <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.lg, fontWeight: "600" }}>
+                  You're all caught up
+                </Text>
+                <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, textAlign: "center" }}>
+                  New items from your connected apps will appear here.
+                </Text>
+              </View>
             )}
           </View>
         ) : (
@@ -789,13 +830,13 @@ export function BriefTabScreen() {
                         flexDirection: "row",
                         alignItems: "center",
                         borderWidth: 1,
-                        borderColor: colors.border,
+                        borderColor: colors.success + "20",
                         borderRadius: 12,
                         paddingVertical: spacing.sm,
                         paddingHorizontal: spacing.md,
-                        backgroundColor: colors.bgSurface,
+                        backgroundColor: colors.success + "08",
                         gap: spacing.sm,
-                        opacity: pressed ? 0.6 : 0.6
+                        opacity: pressed ? 0.5 : 0.7
                       })}
                     >
                       {logoSource ? (
