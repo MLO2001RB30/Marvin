@@ -125,13 +125,12 @@ export async function syncGoogleCalendarForUser(userId: string): Promise<number>
 
   const events = listRes.items ?? [];
 
-  await client
-    .from("external_items")
-    .delete()
-    .eq("user_id", userId)
-    .eq("provider", "google_calendar");
-
   if (events.length === 0) {
+    await client
+      .from("external_items")
+      .delete()
+      .eq("user_id", userId)
+      .eq("provider", "google_calendar");
     return 0;
   }
 
@@ -186,6 +185,14 @@ export async function syncGoogleCalendarForUser(userId: string): Promise<number>
   }));
 
   await client.from("external_items").upsert(rows, { onConflict: "id" });
+
+  const freshIds = rows.map((r) => r.id);
+  await client
+    .from("external_items")
+    .delete()
+    .eq("user_id", userId)
+    .eq("provider", "google_calendar")
+    .not("id", "in", `(${freshIds.join(",")})`);
 
   await client
     .from("integration_accounts")

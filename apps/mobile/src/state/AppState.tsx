@@ -120,9 +120,49 @@ export function AppStateProvider({
     () => Intl.DateTimeFormat().resolvedOptions().timeZone
   );
 
+  const CACHE_KEY = `marvin:appCache:${userId}`;
+
+  const loadCachedState = useCallback(async () => {
+    try {
+      const mod = require("@react-native-async-storage/async-storage");
+      const AsyncStorage = mod.default ?? mod;
+      if (!AsyncStorage?.getItem) return;
+      const raw = await AsyncStorage.getItem(CACHE_KEY);
+      if (!raw) return;
+      const cached = JSON.parse(raw) as {
+        latestContext?: DailyContextSnapshot;
+        externalItems?: ExternalItem[];
+        integrations?: IntegrationAccount[];
+      };
+      if (cached.latestContext) setLatestContext(cached.latestContext);
+      if (cached.externalItems?.length) setExternalItems(cached.externalItems);
+      if (cached.integrations?.length) setIntegrationAccounts(cached.integrations);
+    } catch {
+      // Cache miss is fine
+    }
+  }, [CACHE_KEY]);
+
+  const persistCache = useCallback(async (ctx: DailyContextSnapshot | null, items: ExternalItem[], integrations: IntegrationAccount[]) => {
+    try {
+      const mod = require("@react-native-async-storage/async-storage");
+      const AsyncStorage = mod.default ?? mod;
+      if (!AsyncStorage?.setItem) return;
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
+        latestContext: ctx,
+        externalItems: items.slice(0, 100),
+        integrations
+      }));
+    } catch {
+      // Cache write failure is non-critical
+    }
+  }, [CACHE_KEY]);
+
   const loadAll = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+
+    await loadCachedState();
+
     try {
       const [
         consentsResponse,
@@ -166,6 +206,7 @@ export function AppStateProvider({
       setWorkflows(workflowsResponse.workflows);
       setWorkflowRuns(historyResponse.runs);
       setLatestContext(latestContextResponse.snapshot);
+      if (dailyBriefResponse?.dailyBrief) setDailyBrief(dailyBriefResponse.dailyBrief);
       setAssistantChats(chatsResponse.chats);
       const firstChatId = chatsResponse.chats[0]?.id ?? null;
       setAssistantActiveChatId(firstChatId);
@@ -177,32 +218,37 @@ export function AppStateProvider({
       }
       setUserTimezoneState(profileResponse.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
 
+      void persistCache(latestContextResponse.snapshot, itemsResponse.items, integrationsResponse.integrations);
+
+      setIsLoading(false);
+
       const snapshot = latestContextResponse.snapshot;
       const staleThresholdMs = 15 * 60 * 1000;
       const isStale =
         !snapshot ||
         Date.now() - new Date(snapshot.generatedAtIso).getTime() > staleThresholdMs;
       if (isStale) {
-        void (async () => {
-          try {
-            const { snapshot: fresh, dailyBrief: brief } = await api.runContextPipeline();
-            setLatestContext(fresh);
-            if (brief) setDailyBrief(brief);
-            const { runs } = await api.listHistory();
-            setWorkflowRuns(runs);
-            const { integrations } = await api.listIntegrations();
-            setIntegrationAccounts(integrations);
-          } catch {
-            // ignore – user can refresh manually
-          }
-        })();
+        try {
+          const { snapshot: fresh } = await api.runContextPipeline();
+          setLatestContext(fresh);
+          const [{ runs }, { integrations }, { items }] = await Promise.all([
+            api.listHistory(),
+            api.listIntegrations(),
+            api.listItems()
+          ]);
+          setWorkflowRuns(runs);
+          setIntegrationAccounts(integrations);
+          setExternalItems(items);
+          void persistCache(fresh, items, integrations);
+        } catch {
+          // ignore – user can refresh manually
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load app state.");
-    } finally {
       setIsLoading(false);
     }
-  }, [api]);
+  }, [api, loadCachedState, persistCache]);
 
   const sendAssistantMessage = useCallback(async (payload: AssistantQueryRequest) => {
     const question = payload.question.trim();
@@ -385,9 +431,8 @@ export function AppStateProvider({
       latestContext,
       dailyBrief,
       runContextPipelineNow: async () => {
-        const { snapshot, dailyBrief: brief } = await api.runContextPipeline();
+        const { snapshot } = await api.runContextPipeline();
         setLatestContext(snapshot);
-        if (brief) setDailyBrief(brief);
         const [{ runs }, { integrations }, { items }] = await Promise.all([
           api.listHistory(),
           api.listIntegrations(),
@@ -396,6 +441,7 @@ export function AppStateProvider({
         setWorkflowRuns(runs);
         setIntegrationAccounts(integrations);
         setExternalItems(items);
+        void persistCache(snapshot, items, integrations);
       },
       selectedRunDetails,
       loadRunDetails: async (runId) => {

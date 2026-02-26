@@ -77,12 +77,6 @@ export async function syncGoogleDriveForUser(userId: string): Promise<number> {
     };
   });
 
-  await client
-    .from("external_items")
-    .delete()
-    .eq("user_id", userId)
-    .eq("provider", "google_drive");
-
   const rows = items.map((item) => ({
     id: item.id,
     user_id: userId,
@@ -100,6 +94,14 @@ export async function syncGoogleDriveForUser(userId: string): Promise<number> {
   }));
 
   await client.from("external_items").upsert(rows, { onConflict: "id" });
+
+  const freshIds = rows.map((r) => r.id);
+  await client
+    .from("external_items")
+    .delete()
+    .eq("user_id", userId)
+    .eq("provider", "google_drive")
+    .not("id", "in", `(${freshIds.join(",")})`);
 
   await client
     .from("integration_accounts")

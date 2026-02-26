@@ -201,6 +201,22 @@ export function BriefTabScreen() {
 
   const headline = dailyBrief?.headline ?? latestContext?.summary;
 
+  const calendarToday = externalItems
+    .filter((i) => i.provider === "google_calendar" && i.type === "calendar_event")
+    .filter((i) => {
+      const m = i.summary?.match(/^([\d-]+)/);
+      return m && m[1] === new Date().toISOString().slice(0, 10);
+    })
+    .slice(0, 5);
+
+  const needsReply = openItems.filter((i) => {
+    const ext = externalItems.find((e) => e.id === i.id);
+    return ext?.requiresReply;
+  });
+
+  const whatChanged = latestContext?.whatChanged ?? [];
+  const topBlockers = latestContext?.topBlockers ?? [];
+
   return (
     <View style={{ gap: spacing.section }}>
       <AppHeader
@@ -209,6 +225,74 @@ export function BriefTabScreen() {
         compact
         showLiveIndicator={updatedLabel === "Updated just now"}
       />
+
+      {(calendarToday.length > 0 || needsReply.length > 0 || topBlockers.length > 0) && (
+        <View
+          style={{
+            backgroundColor: colors.bgSurfaceAlt,
+            borderRadius: 20,
+            padding: spacing.lg,
+            gap: spacing.md,
+            borderWidth: 1,
+            borderColor: colors.border
+          }}
+        >
+          {calendarToday.length > 0 && (
+            <View style={{ gap: spacing.xs }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+                {providerLogos.google_calendar && (
+                  <Image source={providerLogos.google_calendar} style={{ width: 18, height: 18, borderRadius: 4 }} resizeMode="contain" />
+                )}
+                <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
+                  Today ({calendarToday.length})
+                </Text>
+              </View>
+              {calendarToday.map((event) => (
+                <View key={event.id} style={{ flexDirection: "row", gap: spacing.sm, paddingVertical: spacing.xs }}>
+                  <Text style={{ color: colors.accentGold, fontSize: typography.sizes.xs, width: 44 }}>
+                    {event.summary?.match(/T(\d{2}:\d{2})/)?.[1] ?? ""}
+                  </Text>
+                  <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm, flex: 1 }} numberOfLines={1}>
+                    {event.title}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {needsReply.length > 0 && (
+            <View style={{ gap: spacing.xs }}>
+              <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
+                Needs reply ({needsReply.length})
+              </Text>
+              {needsReply.slice(0, 3).map((item) => (
+                <Text key={item.id} style={{ color: colors.textPrimary, fontSize: typography.sizes.sm }} numberOfLines={1}>
+                  {displaySlackText(item.title)}
+                </Text>
+              ))}
+            </View>
+          )}
+
+          {topBlockers.length > 0 && (
+            <View style={{ gap: spacing.xs }}>
+              <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
+                Top priorities
+              </Text>
+              {topBlockers.map((b, idx) => (
+                <Text key={idx} style={{ color: colors.textPrimary, fontSize: typography.sizes.sm }} numberOfLines={1}>
+                  {displaySlackText(b)}
+                </Text>
+              ))}
+            </View>
+          )}
+
+          {whatChanged.length > 0 && whatChanged[0] !== "No outstanding items detected." && (
+            <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.xs }}>
+              {whatChanged[0]}
+            </Text>
+          )}
+        </View>
+      )}
 
       <View
         style={{

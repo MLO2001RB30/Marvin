@@ -1,7 +1,6 @@
 import express from "express";
 import {
   type AssistantQueryRequest,
-  type BuildContextRequest,
   type IntegrationProvider,
   type UpsertConsentRequest,
   type UpsertWorkflowRequest
@@ -12,11 +11,9 @@ import {
   listConsents,
   upsertConsent,
   logAssistantAudit,
-  logPipelineTrace,
-  logRecommendationAudit
+  logPipelineTrace
 } from "./services/auditService";
 import { answerAssistantQuestion } from "./services/assistantService";
-import { buildContextResult } from "./services/contextEngine";
 import { buildOutstandingDigest } from "./services/digestService";
 import {
   completeIntegrationOAuth,
@@ -29,7 +26,7 @@ import { syncGmailForUser } from "./services/gmailSyncService";
 import { syncGoogleCalendarForUser } from "./services/googleCalendarSyncService";
 import { syncGoogleDriveForUser } from "./services/googleDriveSyncService";
 import { resolveSlackUserNames, syncSlackForUser } from "./services/slackSyncService";
-import { buildMorningBrief, ingestSignals } from "./services/orchestrationService";
+import { executeWorkflow } from "./services/orchestrationService";
 import {
   addWorkflowRun,
   getWorkflowById,
@@ -38,7 +35,6 @@ import {
   listWorkflows,
   upsertWorkflow
 } from "./services/workflowService";
-import { executeWorkflow } from "./services/orchestrationService";
 import { computeProductMetrics } from "./services/metricsService";
 import { getLatestDailyContext, upsertDailyContext } from "./services/contextSnapshotService";
 import { runDailyContextPipeline } from "./services/pipelineService";
@@ -157,19 +153,12 @@ app.get("/", async (req, res) => {
 });
 
 app.get("/v1/context/:userId", async (req, res) => {
-  const { userId } = req.params;
-  const inputs = await ingestSignals(userId);
-  const result = buildContextResult(inputs);
-  await logRecommendationAudit(userId, result);
-  res.json({ result });
-});
-
-app.post("/v1/context/build", async (req, res) => {
-  const payload = req.body as BuildContextRequest;
-  const inputs = payload.inputs ?? (await ingestSignals(payload.userId));
-  const result = buildContextResult(inputs);
-  await logRecommendationAudit(payload.userId, result);
-  res.json({ result });
+  const snapshot = await getLatestDailyContext(req.params.userId);
+  if (!snapshot) {
+    res.json({ result: null });
+    return;
+  }
+  res.json({ result: { snapshot } });
 });
 
 app.get("/v1/context/:userId/latest", async (req, res) => {
@@ -198,8 +187,18 @@ app.get("/v1/brief/:userId/daily", async (req, res) => {
 });
 
 app.get("/v1/brief/:userId", async (req, res) => {
-  const brief = await buildMorningBrief(req.params.userId);
-  res.json({ brief });
+  const snapshot = await getLatestDailyContext(req.params.userId);
+  const items = await listExternalItems(req.params.userId);
+  const digest = buildOutstandingDigest(items);
+  res.json({
+    brief: {
+      unansweredCount: items.filter((i) => i.requiresReply).length,
+      meetingsToday: items.filter((i) => i.provider === "google_calendar").length,
+      readiness: "Ready",
+      topPriorities: digest.items.slice(0, 3).map((i) => i.title),
+      summary: snapshot?.summary ?? digest.summary
+    }
+  });
 });
 
 app.post("/v1/privacy/consent", async (req, res) => {

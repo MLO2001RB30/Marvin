@@ -87,6 +87,9 @@ export async function buildContextEnvelope(
     id: i.id,
     provider: i.provider,
     title: i.title,
+    summary: (i.summary ?? "").slice(0, 150),
+    sender: i.sender,
+    requires_reply: i.requiresReply,
     urgency: i.tags.includes("urgent") ? "high" : i.requiresReply ? "med" : "low"
   }));
   const outstandingTruncated = outstandingRaw.length > MAX_OUTSTANDING;

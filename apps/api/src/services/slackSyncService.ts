@@ -225,13 +225,15 @@ export async function syncSlackForUser(userId: string): Promise<number> {
     updated_at_iso: item.updated_at_iso
   }));
 
+  await client.from("external_items").upsert(rows, { onConflict: "id" });
+
+  const freshIds = rows.map((r) => r.id);
   await client
     .from("external_items")
     .delete()
     .eq("user_id", userId)
-    .eq("provider", "slack");
-
-  await client.from("external_items").upsert(rows, { onConflict: "id" });
+    .eq("provider", "slack")
+    .not("id", "in", `(${freshIds.join(",")})`);
 
   await client
     .from("integration_accounts")
