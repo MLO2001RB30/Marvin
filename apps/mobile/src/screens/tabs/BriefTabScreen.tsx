@@ -368,21 +368,24 @@ export function BriefTabScreen() {
             padding: spacing.xl,
             gap: spacing.md,
             borderWidth: 1,
-            borderColor: colors.accentGoldTint,
+            borderColor: colors.accentGold + "30",
             borderLeftWidth: 3,
             borderLeftColor: colors.accentGold,
-            shadowColor: "#C9A962",
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.08,
-            shadowRadius: 16,
-            elevation: 4,
+            shadowColor: colors.accentGold,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.12,
+            shadowRadius: 20,
+            elevation: 6,
             marginHorizontal: -4
           }}
         >
           {briefNote && (
-            <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md, lineHeight: typography.sizes.md * 1.5 }}>
-              {briefNote}
-            </Text>
+            <View style={{ flexDirection: "row", gap: spacing.sm, backgroundColor: colors.accentGoldTint, borderRadius: 12, padding: spacing.sm, alignItems: "flex-start" }}>
+              <Feather name="zap" size={14} color={colors.accentGold} style={{ marginTop: 2 }} />
+              <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md, lineHeight: typography.sizes.md * 1.6, flex: 1 }}>
+                {briefNote}
+              </Text>
+            </View>
           )}
 
           {briefPriorities.length > 0 && (
@@ -485,14 +488,12 @@ export function BriefTabScreen() {
                 flexDirection: "row",
                 alignItems: "center",
                 gap: spacing.sm,
-                backgroundColor: colors.bgSurface,
+                backgroundColor: colors.accentGoldTint,
                 borderRadius: 14,
                 paddingHorizontal: spacing.md,
                 paddingVertical: spacing.sm,
-                borderWidth: 1,
-                borderColor: colors.accentGoldTint,
-                borderLeftWidth: 3,
-                borderLeftColor: colors.accentGold,
+                borderWidth: 0,
+                borderLeftWidth: 0,
                 opacity: pressed ? 0.7 : 1,
                 transform: [{ scale: pressed ? 0.98 : 1 }]
               })}
@@ -606,6 +607,8 @@ export function BriefTabScreen() {
                               alignItems: "center",
                               borderWidth: 1,
                               borderColor: colors.border,
+                              borderLeftWidth: 3,
+                              borderLeftColor: urgencyColor,
                               borderRadius: 14,
                               paddingVertical: spacing.sm,
                               paddingHorizontal: spacing.md,
@@ -627,14 +630,14 @@ export function BriefTabScreen() {
                             )}
                             <View style={{ flex: 1, minWidth: 0 }}>
                               <Text
-                                style={{ color: colors.textPrimary, fontSize: typography.sizes.sm }}
+                                style={{ color: colors.textPrimary, fontSize: 13, fontWeight: "600" }}
                                 numberOfLines={2}
                                 ellipsizeMode="tail"
                               >
                                 {request}
                               </Text>
                               <Text
-                                style={{ color: colors.textTertiary, fontSize: typography.sizes.xs }}
+                                style={{ color: colors.textTertiary, fontSize: typography.sizes.xs, opacity: 0.8 }}
                                 numberOfLines={1}
                               >
                                 {sender ?? "—"}
@@ -671,12 +674,17 @@ export function BriefTabScreen() {
                       <Pressable
                         onPress={() => setReviewModalOpen(true)}
                         style={({ pressed }) => ({
-                          alignItems: "center",
+                          alignSelf: "center",
                           paddingVertical: spacing.xs,
-                          opacity: pressed ? 0.6 : 1
+                          paddingHorizontal: spacing.md,
+                          borderWidth: 1,
+                          borderColor: colors.accentGold + "50",
+                          borderRadius: 999,
+                          opacity: pressed ? 0.6 : 1,
+                          backgroundColor: pressed ? colors.accentGoldTint : "transparent"
                         })}
                       >
-                        <Text style={{ color: colors.accentGold, fontSize: typography.sizes.sm }}>
+                        <Text style={{ color: colors.accentGold, fontSize: typography.sizes.sm, fontWeight: "500" }}>
                           Show all {totalCount} →
                         </Text>
                       </Pressable>
@@ -724,7 +732,7 @@ export function BriefTabScreen() {
                         setSelectedItem(item);
                         setSelectedItemFromDone(true);
                       }}
-                      style={{
+                      style={({ pressed }) => ({
                         flexDirection: "row",
                         alignItems: "center",
                         borderWidth: 1,
@@ -733,13 +741,14 @@ export function BriefTabScreen() {
                         paddingVertical: spacing.sm,
                         paddingHorizontal: spacing.md,
                         backgroundColor: colors.bgSurface,
-                        gap: spacing.sm
-                      }}
+                        gap: spacing.sm,
+                        opacity: pressed ? 0.6 : 0.6
+                      })}
                     >
                       {logoSource ? (
                         <Image
                           source={logoSource}
-                          style={{ width: 24, height: 24, borderRadius: 6 }}
+                          style={{ width: 24, height: 24, borderRadius: 6, opacity: 0.5 }}
                           resizeMode="contain"
                         />
                       ) : (
@@ -747,14 +756,14 @@ export function BriefTabScreen() {
                       )}
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text
-                          style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}
+                          style={{ color: colors.textTertiary, fontSize: typography.sizes.sm, textDecorationLine: "line-through" }}
                           numberOfLines={2}
                           ellipsizeMode="tail"
                         >
                           {request}
                         </Text>
                         <Text
-                          style={{ color: colors.textTertiary, fontSize: typography.sizes.xs }}
+                          style={{ color: colors.textTertiary, fontSize: typography.sizes.xs, opacity: 0.6 }}
                           numberOfLines={1}
                         >
                           {sender ?? "—"}

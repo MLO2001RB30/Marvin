@@ -6,8 +6,8 @@ import { useTheme } from "../theme/ThemeProvider";
 export function ProgressRing({
   done,
   total,
-  size = 48,
-  strokeWidth = 4
+  size = 44,
+  strokeWidth = 3
 }: {
   done: number;
   total: number;
@@ -27,8 +27,10 @@ export function ProgressRing({
     }).start();
   }, [progress, animValue]);
 
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
+  const ringColor = progress >= 1 ? colors.success : colors.accentGold;
+  const segments = 12;
+  const segmentAngle = 360 / segments;
+  const filledSegments = Math.round(progress * segments);
 
   return (
     <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
@@ -39,25 +41,27 @@ export function ProgressRing({
           height: size,
           borderRadius: size / 2,
           borderWidth: strokeWidth,
-          borderColor: colors.border
+          borderColor: colors.border + "60"
         }}
       />
-      <View
-        style={{
-          position: "absolute",
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          borderWidth: strokeWidth,
-          borderColor: progress >= 1 ? colors.success : colors.accentGold,
-          borderTopColor: progress > 0 ? (progress >= 1 ? colors.success : colors.accentGold) : "transparent",
-          borderRightColor: progress > 0.25 ? (progress >= 1 ? colors.success : colors.accentGold) : "transparent",
-          borderBottomColor: progress > 0.5 ? (progress >= 1 ? colors.success : colors.accentGold) : "transparent",
-          borderLeftColor: progress > 0.75 ? (progress >= 1 ? colors.success : colors.accentGold) : "transparent",
-          transform: [{ rotate: "-90deg" }]
-        }}
-      />
-      <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.xs, fontWeight: "600" }}>
+      {progress > 0 && (
+        <View
+          style={{
+            position: "absolute",
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            borderWidth: strokeWidth,
+            borderColor: ringColor,
+            borderTopColor: progress > 0 ? ringColor : "transparent",
+            borderRightColor: progress > 0.25 ? ringColor : "transparent",
+            borderBottomColor: progress > 0.5 ? ringColor : "transparent",
+            borderLeftColor: progress > 0.75 ? ringColor : "transparent",
+            transform: [{ rotate: "-90deg" }]
+          }}
+        />
+      )}
+      <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.xs, fontWeight: "700" }}>
         {done}/{total}
       </Text>
     </View>
