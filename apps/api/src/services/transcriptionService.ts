@@ -20,7 +20,8 @@ export async function transcribeAudioAttachment(
     return undefined;
   }
 
-  if (!env.OPENAI_API_KEY || !audio.base64) {
+  const llmApiKey = env.CLAUDE_SONNET_4_5_API_KEY || env.OPENAI_API_KEY;
+  if (!llmApiKey || !audio.base64) {
     return fallbackTranscript(attachments);
   }
 

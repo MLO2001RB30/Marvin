@@ -26,6 +26,7 @@ import {
 import type { AssistantAttachment, AssistantChatMessage } from "@pia/shared";
 import { slackEmojiToUnicode } from "@pia/shared";
 
+import { StructuredMessageRenderer } from "../../components/chat/StructuredMessageRenderer";
 import { useAppState } from "../../state/AppState";
 import { useTheme } from "../../theme/ThemeProvider";
 
@@ -447,10 +448,10 @@ function ChatMessageBubble({
   typography
 }: {
   message: AssistantChatMessage;
-  colors: { textPrimary: string; textTertiary: string; border: string; bgSurface: string; bgSurfaceAlt: string };
-  spacing: { xs: number; md: number };
+  colors: { textPrimary: string; textSecondary: string; textTertiary: string; border: string; bgSurface: string; bgSurfaceAlt: string; accentGold: string; accentGoldTint: string; danger: string; success: string; info: string };
+  spacing: { xxs: number; xs: number; sm: number; md: number; lg: number };
   radius: { card: number };
-  typography: { sizes: { md: number; sm: number } };
+  typography: { sizes: { xs: number; sm: number; md: number; lg: number } };
 }) {
   const isAssistant = message.role === "assistant";
   const isThinking = message.id === "thinking-placeholder";
@@ -489,6 +490,13 @@ function ChatMessageBubble({
       >
         {isThinking ? (
           <ThinkingDots colors={colors} />
+        ) : message.role === "assistant" && message.structured ? (
+          <StructuredMessageRenderer
+            structured={message.structured}
+            colors={colors}
+            typography={typography}
+            spacing={spacing}
+          />
         ) : message.role === "assistant" ? (
           <FormattedAssistantMessage
             text={message.text}

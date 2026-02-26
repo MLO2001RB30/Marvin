@@ -6,6 +6,7 @@ import type {
   ExternalItem,
   OutstandingItem,
   RecommendedAction,
+  StructuredAssistantResponse,
   WorkflowRun
 } from "@pia/shared";
 
@@ -96,8 +97,9 @@ export async function answerAssistantQuestion(
 ): Promise<AssistantAnswer> {
   const topItems = snapshot ? snapshot.outstandingItems.slice(0, 5) : [];
 
-  if (!env.OPENAI_API_KEY) {
-    console.warn("[assistant] OPENAI_API_KEY not set in .env – using template answer. Add OPENAI_API_KEY to apps/api/.env");
+  const llmApiKey = env.CLAUDE_SONNET_4_5_API_KEY || env.OPENAI_API_KEY;
+  if (!llmApiKey) {
+    console.warn("[assistant] No LLM API key set – using template answer. Add CLAUDE_SONNET_4_5_API_KEY or OPENAI_API_KEY to env");
     return buildTemplateAnswer(question, snapshot, recentRuns, attachments, audioTranscript);
   }
 
@@ -144,6 +146,7 @@ export async function answerAssistantQuestion(
   }
 
   let answerText: string;
+  let structured: StructuredAssistantResponse | undefined;
   let recommendedActions: RecommendedAction[] = [];
 
   try {
@@ -161,8 +164,21 @@ export async function answerAssistantQuestion(
 
     const raw = result.content.trim();
     try {
-      const parsed = JSON.parse(raw) as { answer?: string; recommended_actions?: RecommendedAction[] };
-      if (typeof parsed.answer === "string") {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+
+      if (typeof parsed.display_type === "string" && typeof parsed.summary === "string") {
+        structured = {
+          display_type: parsed.display_type as StructuredAssistantResponse["display_type"],
+          summary: parsed.summary,
+          items: Array.isArray(parsed.items) ? parsed.items : undefined,
+          events: Array.isArray(parsed.events) ? parsed.events : undefined,
+          action_status: parsed.action_status as "success" | "failed" | undefined,
+          action_description: typeof parsed.action_description === "string" ? parsed.action_description : undefined,
+          recommended_actions: Array.isArray(parsed.recommended_actions) ? parsed.recommended_actions : undefined
+        };
+        answerText = parsed.summary as string;
+        recommendedActions = structured.recommended_actions ?? [];
+      } else if (typeof parsed.answer === "string") {
         answerText = parsed.answer;
         recommendedActions = Array.isArray(parsed.recommended_actions) ? parsed.recommended_actions : [];
       } else {
@@ -173,7 +189,7 @@ export async function answerAssistantQuestion(
     }
 
     if (!answerText) {
-      console.warn("[assistant] OpenAI returned empty content");
+      console.warn("[assistant] LLM returned empty content");
       return buildTemplateAnswer(question, snapshot, recentRuns, attachments, audioTranscript);
     }
 
@@ -188,6 +204,7 @@ export async function answerAssistantQuestion(
     return {
       question,
       answer: answerText,
+      structured,
       citedItems: topItems.map((item) => ({
         itemId: item.itemId,
         provider: item.provider,
@@ -208,7 +225,7 @@ export async function answerAssistantQuestion(
       generatedAtIso: new Date().toISOString()
     };
   } catch (err) {
-    console.warn("[assistant] OpenAI request failed:", err);
+    console.warn("[assistant] LLM request failed:", err);
     return buildTemplateAnswer(question, snapshot, recentRuns, attachments, audioTranscript);
   }
 }

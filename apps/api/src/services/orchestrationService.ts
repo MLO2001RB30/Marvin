@@ -66,7 +66,7 @@ export async function executeWorkflow(
     });
 
     let enhancedDigest = digest;
-    if (env.OPENAI_API_KEY) {
+    if (env.CLAUDE_SONNET_4_5_API_KEY || env.OPENAI_API_KEY) {
       try {
         const runContext = JSON.stringify({
           workflow_id: workflow.id,

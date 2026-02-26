@@ -8,8 +8,9 @@ import { runDailyContextPipeline } from "../services/pipelineService";
 import { upsertDailyBrief } from "../services/dailyBriefService";
 
 export async function runDailyBriefForUser(userId: string): Promise<DailyBriefJson | null> {
-  if (!env.OPENAI_API_KEY) {
-    console.warn("[dailyBrief] OPENAI_API_KEY not set");
+  const llmApiKey = env.CLAUDE_SONNET_4_5_API_KEY || env.OPENAI_API_KEY;
+  if (!llmApiKey) {
+    console.warn("[dailyBrief] No LLM API key set");
     return null;
   }
 

@@ -44,6 +44,10 @@ function sha256Hex(input: string): string {
 const LLM_TIMEOUT_MS = 60_000;
 const MAX_TOOL_ITERATIONS = 3;
 
+function resolveApiKey(): string | undefined {
+  return env.CLAUDE_SONNET_4_5_API_KEY || env.OPENAI_API_KEY;
+}
+
 export async function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
   const {
     systemPrompts,
@@ -102,7 +106,7 @@ export async function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
   while (iterations < MAX_TOOL_ITERATIONS) {
     iterations++;
     const headers: Record<string, string> = {
-      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      Authorization: `Bearer ${resolveApiKey()}`,
       "Content-Type": "application/json"
     };
     if (baseUrl.includes("openrouter.ai")) {

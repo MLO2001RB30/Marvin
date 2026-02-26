@@ -10,6 +10,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(4000),
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  CLAUDE_SONNET_4_5_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
   OPENAI_MODEL: z.string().default("anthropic/claude-sonnet-4.5"),

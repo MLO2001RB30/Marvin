@@ -280,12 +280,15 @@ export function AppStateProvider({
         ...current,
         [chatId]: true
       }));
+      const enrichedAssistantMessage = response.structured
+        ? { ...assistantMessage, structured: response.structured }
+        : assistantMessage;
       setAssistantMessages((current) => {
         const withoutThinking = current.filter((m) => m.id !== "thinking-placeholder");
         if (assistantActiveChatId && assistantActiveChatId === chatId) {
-          return [...withoutThinking, userMessage, assistantMessage];
+          return [...withoutThinking, userMessage, enrichedAssistantMessage];
         }
-        return [userMessage, assistantMessage];
+        return [userMessage, enrichedAssistantMessage];
       });
       const { chats } = await api.listAssistantChats();
       setAssistantChats(chats);

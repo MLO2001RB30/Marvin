@@ -204,13 +204,49 @@ export interface AssistantAttachment {
 
 export interface RecommendedAction {
   label: string;
-  action_type: "open_thread" | "draft_reply" | "run_workflow" | "open_calendar" | "none";
+  action_type: "reply_email" | "reply_slack" | "create_event" | "run_workflow" | "open_thread" | "draft_reply" | "open_calendar" | "none";
   payload?: Record<string, unknown>;
+}
+
+export type AssistantDisplayType =
+  | "text"
+  | "items_list"
+  | "calendar_view"
+  | "action_result";
+
+export interface DisplayItem {
+  provider: IntegrationProvider;
+  sender: string;
+  channel?: string;
+  header: string;
+  body: string;
+  item_id?: string;
+  urgency?: "high" | "med" | "low";
+  actions: RecommendedAction[];
+}
+
+export interface DisplayCalendarEvent {
+  start: string;
+  end: string;
+  title: string;
+  location?: string;
+  organizer?: string;
+}
+
+export interface StructuredAssistantResponse {
+  display_type: AssistantDisplayType;
+  summary: string;
+  items?: DisplayItem[];
+  events?: DisplayCalendarEvent[];
+  action_status?: "success" | "failed";
+  action_description?: string;
+  recommended_actions?: RecommendedAction[];
 }
 
 export interface AssistantAnswer {
   question: string;
   answer: string;
+  structured?: StructuredAssistantResponse;
   citedItems: Array<{ itemId: string; provider: IntegrationProvider; reason: string }>;
   contextReferences?: AssistantContextReference[];
   recommendedActions?: RecommendedAction[];
@@ -227,6 +263,7 @@ export interface AssistantChatMessage {
   createdAtIso: string;
   attachments?: AssistantAttachment[];
   contextReferences?: AssistantContextReference[];
+  structured?: StructuredAssistantResponse;
 }
 
 export interface AssistantChat {

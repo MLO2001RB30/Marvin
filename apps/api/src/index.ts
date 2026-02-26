@@ -670,7 +670,10 @@ app.get("/v1/team/:teamId/brief", async (req, res) => {
 app.listen(env.PORT, () => {
   startScheduler();
   console.log(`PIA API listening on port ${env.PORT}`);
-  if (!env.OPENAI_API_KEY) {
-    console.warn("OPENAI_API_KEY not set – assistant will use template answers. Add it to apps/api/.env");
+  const llmApiKey = env.CLAUDE_SONNET_4_5_API_KEY || env.OPENAI_API_KEY;
+  if (!llmApiKey) {
+    console.warn("No LLM API key set – assistant will use template answers. Set CLAUDE_SONNET_4_5_API_KEY or OPENAI_API_KEY");
+  } else {
+    console.info(`LLM configured: model=${env.OPENAI_MODEL} provider=${env.OPENAI_BASE_URL.includes("openrouter") ? "OpenRouter" : "direct"}`);
   }
 });
