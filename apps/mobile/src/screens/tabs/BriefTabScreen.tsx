@@ -121,13 +121,19 @@ function formatItemDate(iso: string | undefined): string {
   const d = new Date(iso);
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
+  if (diffMs < 0) return "Just now";
   const diffMins = Math.floor(diffMs / 60000);
   if (diffMins < 1) return "Just now";
   if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
+  const totalHours = Math.floor(diffMins / 60);
+  if (totalHours < 24) return `${totalHours}h ago`;
+  const days = Math.floor(totalHours / 24);
+  const remainingHours = totalHours % 24;
+  if (days < 2) return remainingHours > 0 ? `1 day ${remainingHours}h ago` : "1 day ago";
+  if (days < 7) return remainingHours > 0 ? `${days} days ${remainingHours}h ago` : `${days} days ago`;
+  const weeks = Math.floor(days / 7);
+  const remainingDays = days % 7;
+  if (weeks < 4) return remainingDays > 0 ? `${weeks}w ${remainingDays}d ago` : `${weeks}w ago`;
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
@@ -336,18 +342,22 @@ export function BriefTabScreen() {
   const topBlockers = latestContext?.topBlockers ?? [];
 
   return (
-    <View style={{ gap: spacing.section }}>
+    <View style={{ gap: spacing.lg }}>
       <AppHeader
         title={`${greeting}, ${displayName}`}
         subtitle={(headline ?? updatedLabel) || "Personal AI Assistant"}
         compact
         showLiveIndicator={updatedLabel === "Updated just now"}
-        rightElement={
-          allItems.length > 0 ? (
-            <ProgressRing done={doneItems.length} total={allItems.length} />
-          ) : undefined
-        }
       />
+
+      {allItems.length > 0 && (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+          <ProgressRing done={doneItems.length} total={allItems.length} />
+          <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}>
+            {doneItems.length} of {allItems.length} items cleared
+          </Text>
+        </View>
+      )}
 
       {/* Intelligence Hero — LLM-generated daily brief */}
       {(briefPriorities.length > 0 || briefNote) && (
@@ -355,12 +365,18 @@ export function BriefTabScreen() {
           style={{
             backgroundColor: colors.bgSurface,
             borderRadius: 20,
-            padding: spacing.lg,
+            padding: spacing.xl,
             gap: spacing.md,
             borderWidth: 1,
             borderColor: colors.accentGoldTint,
             borderLeftWidth: 3,
-            borderLeftColor: colors.accentGold
+            borderLeftColor: colors.accentGold,
+            shadowColor: "#C9A962",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.08,
+            shadowRadius: 16,
+            elevation: 4,
+            marginHorizontal: -4
           }}
         >
           {briefNote && (
@@ -411,97 +427,6 @@ export function BriefTabScreen() {
             </View>
           )}
 
-        </View>
-      )}
-
-      {(calendarToday.length > 0 || needsReply.length > 0 || topBlockers.length > 0) && (
-        <View
-          style={{
-            backgroundColor: colors.bgSurfaceAlt,
-            borderRadius: 20,
-            padding: spacing.lg,
-            gap: spacing.md,
-            borderWidth: 1,
-            borderColor: colors.border
-          }}
-        >
-          {calendarToday.length > 0 && (
-            <View style={{ gap: spacing.xs }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
-                {providerLogos.google_calendar && (
-                  <Image source={providerLogos.google_calendar} style={{ width: 18, height: 18, borderRadius: 4 }} resizeMode="contain" />
-                )}
-                <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
-                  Today ({calendarToday.length})
-                </Text>
-              </View>
-              {calendarToday.map((event, idx) => {
-                const time = event.summary?.match(/T(\d{2}:\d{2})/)?.[1] ?? "";
-                const endTime = event.summary?.match(/[–-]\s*[\d-]+T(\d{2}:\d{2})/)?.[1] ?? "";
-                return (
-                  <View key={event.id} style={{ flexDirection: "row", gap: spacing.sm, alignItems: "stretch" }}>
-                    <View style={{ alignItems: "center", width: 44 }}>
-                      <Text style={{ color: colors.accentGold, fontSize: typography.sizes.xs, fontWeight: "600" }}>
-                        {time}
-                      </Text>
-                      {endTime && (
-                        <Text style={{ color: colors.textTertiary, fontSize: 9 }}>{endTime}</Text>
-                      )}
-                    </View>
-                    <View style={{ width: 2, backgroundColor: colors.accentGold, borderRadius: 1, marginVertical: 2, opacity: 0.4 }} />
-                    <View
-                      style={{
-                        flex: 1,
-                        backgroundColor: colors.bgSurface,
-                        borderRadius: 10,
-                        paddingHorizontal: spacing.sm,
-                        paddingVertical: spacing.xs,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        marginBottom: idx < calendarToday.length - 1 ? spacing.xxs : 0
-                      }}
-                    >
-                      <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm }} numberOfLines={1}>
-                        {event.title}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-
-          {needsReply.length > 0 && (
-            <View style={{ gap: spacing.xs }}>
-              <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
-                Needs reply ({needsReply.length})
-              </Text>
-              {needsReply.slice(0, 3).map((item) => (
-                <Text key={item.id} style={{ color: colors.textPrimary, fontSize: typography.sizes.sm }} numberOfLines={1}>
-                  {displaySlackText(item.title)}
-                </Text>
-              ))}
-            </View>
-          )}
-
-          {topBlockers.length > 0 && (
-            <View style={{ gap: spacing.xs }}>
-              <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
-                Top priorities
-              </Text>
-              {topBlockers.map((b, idx) => (
-                <Text key={idx} style={{ color: colors.textPrimary, fontSize: typography.sizes.sm }} numberOfLines={1}>
-                  {displaySlackText(b)}
-                </Text>
-              ))}
-            </View>
-          )}
-
-          {whatChanged.length > 0 && whatChanged[0] !== "No outstanding items detected." && (
-            <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.xs }}>
-              {whatChanged[0]}
-            </Text>
-          )}
         </View>
       )}
 
@@ -556,7 +481,7 @@ export function BriefTabScreen() {
           {suggestions.map((s) => (
             <Pressable
               key={s.id}
-              style={{
+              style={({ pressed }) => ({
                 flexDirection: "row",
                 alignItems: "center",
                 gap: spacing.sm,
@@ -567,8 +492,10 @@ export function BriefTabScreen() {
                 borderWidth: 1,
                 borderColor: colors.accentGoldTint,
                 borderLeftWidth: 3,
-                borderLeftColor: colors.accentGold
-              }}
+                borderLeftColor: colors.accentGold,
+                opacity: pressed ? 0.7 : 1,
+                transform: [{ scale: pressed ? 0.98 : 1 }]
+              })}
             >
               <Feather
                 name={s.type === "reply_overdue" ? "alert-circle" : s.type === "meeting_prep" ? "calendar" : "info"}
@@ -606,13 +533,14 @@ export function BriefTabScreen() {
           {hasOpenItems && (
             <Pressable
               onPress={() => setReviewModalOpen(true)}
-              style={{
+              style={({ pressed }) => ({
                 borderWidth: 1,
                 borderColor: colors.accentGold,
                 borderRadius: 999,
                 paddingHorizontal: spacing.md,
-                paddingVertical: spacing.xs
-              }}
+                paddingVertical: spacing.xs,
+                backgroundColor: pressed ? colors.accentGoldTint : "transparent"
+              })}
             >
               <Text style={{ color: colors.accentGold, fontSize: typography.sizes.sm }}>
                 Review
@@ -645,110 +573,114 @@ export function BriefTabScreen() {
           </View>
         ) : (
           <View style={{ gap: spacing.lg }}>
-            {cohorts.map(({ urgency, label, icon: urgencyIcon, color: urgencyColor, items, totalCount }) => {
+            {cohorts.map(({ urgency, label, icon: urgencyIcon, color: urgencyColor, items, totalCount }, cohortIdx) => {
               const stackHeight = stackHeightFor(items.length);
               return (
                 <View key={urgency} style={{ gap: spacing.xs }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs, backgroundColor: urgencyColor + "0A", borderRadius: 8, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, marginTop: cohortIdx > 0 ? spacing.md : 0 }}>
                     <Feather name={urgencyIcon} size={16} color={urgencyColor} />
-                    <Text style={{ color: urgencyColor, fontSize: typography.sizes.sm, fontWeight: "600" }}>
+                    <Text style={{ color: urgencyColor, fontSize: typography.sizes.md, fontWeight: "700" }}>
                       {label} ({totalCount})
                     </Text>
                   </View>
-                  <View style={{ height: stackHeight, position: "relative" }}>
-                    {items.map((item, index) => {
-                      const pColor = providerColors[item.provider] ?? colors.border;
+                  <View style={{ gap: spacing.xs }}>
+                    {items.slice(0, 3).map((item) => {
+                      const logoSource = providerLogos[item.provider];
                       const request = displaySlackText(item.title || item.summary || "");
                       const sender = item.sender ? displaySlackText(item.sender) : null;
                       const date = formatItemDate(item.dateIso);
-                      const stackIndex = items.length - 1 - index;
-                      const topOffset = CARD_HEIGHT * 0.2 * index;
                       return (
-                        <View
+                        <SwipeableCard
                           key={item.id}
-                          style={{
-                            position: "absolute",
-                            top: topOffset,
-                            left: 0,
-                            right: 0,
-                            height: CARD_HEIGHT,
-                            zIndex: items.length - index
-                          }}
+                          onSwipeRight={() => setItemStatus(item.id, "done")}
+                          onSwipeLeft={() => setItemStatus(item.id, "reply")}
                         >
-                          <SwipeableCard
-                            onSwipeRight={() => setItemStatus(item.id, "done")}
-                            onSwipeLeft={() => setItemStatus(item.id, "reply")}
+                          <Pressable
+                            onPress={() => {
+                              setSelectedItem(item);
+                              setSelectedItemFromDone(false);
+                            }}
+                            onLongPress={() => setItemStatus(item.id, "done")}
+                            style={({ pressed }) => ({
+                              flexDirection: "row",
+                              alignItems: "center",
+                              borderWidth: 1,
+                              borderColor: colors.border,
+                              borderRadius: 14,
+                              paddingVertical: spacing.sm,
+                              paddingHorizontal: spacing.md,
+                              backgroundColor: colors.bgSurface,
+                              gap: spacing.sm,
+                              shadowColor: "#000",
+                              shadowOffset: { width: 0, height: 2 },
+                              shadowOpacity: 0.06,
+                              shadowRadius: 8,
+                              elevation: 2,
+                              opacity: pressed ? 0.7 : 1,
+                              transform: [{ scale: pressed ? 0.98 : 1 }]
+                            })}
                           >
+                            {logoSource ? (
+                              <Image source={logoSource} style={{ width: 24, height: 24, borderRadius: 6 }} resizeMode="contain" />
+                            ) : (
+                              <SenderAvatar sender={item.sender} provider={item.provider} size={24} />
+                            )}
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                              <Text
+                                style={{ color: colors.textPrimary, fontSize: typography.sizes.sm }}
+                                numberOfLines={2}
+                                ellipsizeMode="tail"
+                              >
+                                {request}
+                              </Text>
+                              <Text
+                                style={{ color: colors.textTertiary, fontSize: typography.sizes.xs }}
+                                numberOfLines={1}
+                              >
+                                {sender ?? "—"}
+                                {date ? ` · ${date}` : ""}
+                              </Text>
+                            </View>
                             <Pressable
-                              onPress={() => {
+                              onPress={(e) => {
+                                e.stopPropagation();
                                 setSelectedItem(item);
                                 setSelectedItemFromDone(false);
+                                setReplyText("");
                               }}
-                              onLongPress={() => setItemStatus(item.id, "done")}
-                              style={{
-                                height: CARD_HEIGHT,
-                                flexDirection: "row",
-                                alignItems: "center",
-                                borderWidth: 1,
-                                borderColor: colors.border,
-                                borderLeftWidth: 3,
-                                borderLeftColor: pColor,
-                                borderRadius: 14,
-                                paddingVertical: spacing.sm,
-                                paddingHorizontal: spacing.md,
-                                backgroundColor: colors.bgSurface,
-                                gap: spacing.sm,
-                                shadowColor: "#000",
-                                shadowOffset: { width: 0, height: stackIndex * 2 },
-                                shadowOpacity: 0.08 + stackIndex * 0.02,
-                                shadowRadius: 4 + stackIndex,
-                                elevation: 2 + stackIndex
-                              }}
+                              hitSlop={8}
+                              style={({ pressed }) => ({ padding: spacing.xs, opacity: pressed ? 0.5 : 1 })}
                             >
-                              <SenderAvatar sender={item.sender} provider={item.provider} size={28} />
-                              <View style={{ flex: 1, minWidth: 0 }}>
-                                <Text
-                                  style={{ color: colors.textPrimary, fontSize: typography.sizes.sm }}
-                                  numberOfLines={3}
-                                  ellipsizeMode="tail"
-                                >
-                                  {request}
-                                </Text>
-                                <Text
-                                  style={{ color: colors.textTertiary, fontSize: typography.sizes.xs }}
-                                  numberOfLines={1}
-                                >
-                                  {sender ?? "—"}
-                                  {date ? ` · ${date}` : ""}
-                                </Text>
-                              </View>
-                              <Pressable
-                                onPress={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedItem(item);
-                                  setSelectedItemFromDone(false);
-                                  setReplyText("");
-                                }}
-                                hitSlop={8}
-                                style={{ padding: spacing.xs }}
-                              >
-                                <Feather name="corner-up-left" size={14} color={colors.accentGold} />
-                              </Pressable>
-                              <Pressable
-                                onPress={(e) => {
-                                  e.stopPropagation();
-                                  setItemStatus(item.id, "done");
-                                }}
-                                hitSlop={8}
-                                style={{ padding: spacing.xs }}
-                              >
-                                <Feather name="check" size={16} color={colors.textTertiary} />
-                              </Pressable>
+                              <Feather name="corner-up-left" size={14} color={colors.accentGold} />
                             </Pressable>
-                          </SwipeableCard>
-                        </View>
+                            <Pressable
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                setItemStatus(item.id, "done");
+                              }}
+                              hitSlop={8}
+                              style={({ pressed }) => ({ padding: spacing.xs, opacity: pressed ? 0.5 : 1 })}
+                            >
+                              <Feather name="check" size={16} color={colors.textTertiary} />
+                            </Pressable>
+                          </Pressable>
+                        </SwipeableCard>
                       );
                     })}
+                    {totalCount > 3 && (
+                      <Pressable
+                        onPress={() => setReviewModalOpen(true)}
+                        style={({ pressed }) => ({
+                          alignItems: "center",
+                          paddingVertical: spacing.xs,
+                          opacity: pressed ? 0.6 : 1
+                        })}
+                      >
+                        <Text style={{ color: colors.accentGold, fontSize: typography.sizes.sm }}>
+                          Show all {totalCount} →
+                        </Text>
+                      </Pressable>
+                    )}
                   </View>
                 </View>
               );
