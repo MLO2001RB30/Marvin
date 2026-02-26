@@ -430,14 +430,19 @@ export function AppStateProvider({
       },
       workflowRuns,
       runWorkflowNow: async (workflowId) => {
+        try {
         const { run } = await api.runWorkflow(workflowId);
         setWorkflowRuns((current) => [run, ...current]);
         const { snapshot } = await api.getLatestContext();
         setLatestContext(snapshot);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Workflow failed");
+        }
       },
       latestContext,
       dailyBrief,
       runContextPipelineNow: async () => {
+        try {
         const { snapshot, dailyBrief: brief } = await api.runContextPipeline();
         setLatestContext(snapshot);
         if (brief) setDailyBrief(brief);
@@ -450,6 +455,9 @@ export function AppStateProvider({
         setIntegrationAccounts(integrations);
         setExternalItems(items);
         void persistCache(snapshot, items, integrations);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Pipeline failed");
+        }
       },
       selectedRunDetails,
       loadRunDetails: async (runId) => {

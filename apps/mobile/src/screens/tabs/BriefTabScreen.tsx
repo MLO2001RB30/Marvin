@@ -230,7 +230,9 @@ export function BriefTabScreen() {
     isLoading,
     suggestions,
     replyToEmail,
-    replyToSlack
+    replyToSlack,
+    sendAssistantMessage,
+    startAssistantChat
   } = useAppState();
   const { user } = useAuthState();
   const accessToken = user ? (user as unknown as { access_token?: string }).access_token : undefined;
@@ -240,6 +242,8 @@ export function BriefTabScreen() {
   const [doneFolderExpanded, setDoneFolderExpanded] = useState(false);
   const [selectedItemFromDone, setSelectedItemFromDone] = useState(false);
   const [replyText, setReplyText] = useState("");
+  const [replySending, setReplySending] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
   const [contextPackages, setContextPackages] = useState<Array<{ id: string; triggerType: string; title: string; summary: string; startsAtIso: string; evidence: Array<{ id: string; kind: string; title: string; summary: string | null; reason: string; provider: string | null }> }>>([]);
   const { itemStatuses, setItemStatus: rawSetItemStatus, getItemStatus } = useItemStatuses(user?.id ?? "");
 
@@ -484,6 +488,20 @@ export function BriefTabScreen() {
           {suggestions.map((s) => (
             <Pressable
               key={s.id}
+              onPress={() => {
+                if (s.actionType === "reply" && s.itemId) {
+                  const item = externalItems.find((e) => e.id === s.itemId);
+                  if (item) {
+                    setSelectedItem(toOpenItem(item));
+                    setSelectedItemFromDone(false);
+                    setReplyText("");
+                    return;
+                  }
+                }
+                startAssistantChat();
+                setActiveTab("assistant");
+                void sendAssistantMessage({ question: s.body || s.title });
+              }}
               style={({ pressed }) => ({
                 flexDirection: "row",
                 alignItems: "center",
@@ -892,12 +910,12 @@ export function BriefTabScreen() {
                       const text = replyText.trim();
                       setReplyText("");
                       if (selectedItem.provider === "gmail") {
-                        void replyToEmail(selectedItem.id, text);
+                        replyToEmail(selectedItem.id, text).catch(() => {});
                       } else if (selectedItem.provider === "slack" && selectedItem.sourceRef) {
                         const parts = selectedItem.sourceRef.split(":");
                         const channelId = parts[0];
                         const threadTs = parts[1] || undefined;
-                        void replyToSlack(channelId, text, threadTs);
+                        replyToSlack(channelId, text, threadTs).catch(() => {});
                       }
                       setItemStatus(selectedItem.id, "done");
                       setSelectedItem(null);

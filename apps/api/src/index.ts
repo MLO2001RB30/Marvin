@@ -1,4 +1,4 @@
-import express from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import {
   type AssistantQueryRequest,
@@ -52,10 +52,33 @@ import {
   listAssistantChatMessages,
   listAssistantChats
 } from "./services/assistantChatService";
+import rateLimit from "express-rate-limit";
+import { asyncHandler } from "./utils/asyncHandler";
 
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: "20mb" }));
+app.use(cors({
+  origin: process.env.CORS_ORIGINS?.split(",").map(s => s.trim()) || true,
+  credentials: true
+}));
+app.use(express.json({ limit: "5mb" }));
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again in a minute" }
+});
+
+const llmLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many AI requests, please wait a moment" }
+});
+
+app.use("/v1", apiLimiter);
 
 app.use((req, res, next) => {
   const start = performance.now();
@@ -173,17 +196,22 @@ app.get("/v1/context/:userId/latest", async (req, res) => {
 });
 
 app.post("/v1/context/:userId/pipeline/run", async (req, res) => {
-  const { snapshot, traces } = await runDailyContextPipeline(req.params.userId);
-  void logPipelineTrace(req.params.userId, traces, snapshot.id);
-
-  let dailyBrief = null;
   try {
-    dailyBrief = await runDailyBriefForUser(req.params.userId);
-  } catch (err) {
-    console.warn("[pipeline] Daily brief generation failed:", err);
-  }
+    const { snapshot, traces } = await runDailyContextPipeline(req.params.userId);
+    void logPipelineTrace(req.params.userId, traces, snapshot.id);
 
-  res.json({ snapshot, traces, dailyBrief });
+    let dailyBrief = null;
+    try {
+      dailyBrief = await runDailyBriefForUser(req.params.userId);
+    } catch (err) {
+      console.warn("[pipeline] Daily brief generation failed:", err);
+    }
+
+    res.json({ snapshot, traces, dailyBrief });
+  } catch (err) {
+    console.error("[pipeline] Pipeline run failed:", err);
+    res.status(500).json({ error: "Pipeline run failed" });
+  }
 });
 
 app.get("/v1/brief/:userId/daily", async (req, res) => {
@@ -413,7 +441,8 @@ app.get("/v1/metrics/:userId", async (req, res) => {
 });
 
 app.get("/v1/search/:userId", async (req, res) => {
-  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  try {
+  const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 200) : "";
   if (!q) {
     res.json({ results: [], query: "" });
     return;
@@ -455,6 +484,10 @@ app.get("/v1/search/:userId", async (req, res) => {
     bodyText: row.body_text
   }));
   res.json({ results, query: q });
+  } catch (err) {
+    console.error("[search] Search failed:", err);
+    res.status(500).json({ error: "Search failed" });
+  }
 });
 
 app.get("/v1/context-packages/:userId", async (req, res) => {
@@ -469,7 +502,7 @@ app.get("/v1/digest/:userId", async (req, res) => {
   res.json({ digest });
 });
 
-app.get("/v1/assistant/:userId/stream", async (req, res) => {
+app.get("/v1/assistant/:userId/stream", llmLimiter, async (req, res) => {
   const question = typeof req.query.q === "string" ? req.query.q : "";
   if (!question.trim()) {
     res.status(400).json({ error: "q parameter required" });
@@ -559,8 +592,17 @@ app.get("/v1/assistant/:userId/stream", async (req, res) => {
   }
 });
 
-app.post("/v1/assistant/:userId/query", async (req, res) => {
+app.post("/v1/assistant/:userId/query", llmLimiter, async (req, res) => {
+  try {
   const payload = req.body as AssistantQueryRequest;
+  if (!payload.question || typeof payload.question !== "string") {
+    res.status(400).json({ error: "question is required" });
+    return;
+  }
+  if (payload.question.length > 4000) {
+    res.status(400).json({ error: "question too long (max 4000 chars)" });
+    return;
+  }
   const attachments = payload.attachments ?? [];
 
   if (payload.timezone?.trim()) {
@@ -658,6 +700,10 @@ app.post("/v1/assistant/:userId/query", async (req, res) => {
     userMessage,
     assistantMessage
   });
+  } catch (err) {
+    console.error("[assistant] Query failed:", err);
+    res.status(500).json({ error: "Assistant query failed" });
+  }
 });
 
 app.get("/v1/profile/:userId", async (req, res) => {
@@ -817,6 +863,8 @@ app.get("/v1/team/:teamId/brief", async (req, res) => {
 
 app.post("/webhooks/slack/events", async (req, res) => {
   try {
+    // TODO: Verify Slack signing secret in production
+    // const signingSecret = process.env.SLACK_SIGNING_SECRET;
     const { handleSlackEventPayload } = await import("./services/realtimeSyncService");
     const result = await handleSlackEventPayload(req.body as Record<string, unknown>);
     if (result.challenge) {
@@ -859,6 +907,22 @@ app.post("/webhooks/calendar/push", async (req, res) => {
 app.get("/webhooks/status", async (_req, res) => {
   const { getRecentWebhookEvents } = await import("./services/realtimeSyncService");
   res.json({ events: getRecentWebhookEvents(), count: getRecentWebhookEvents().length });
+});
+
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error("[server] Unhandled error:", err.message);
+  if (!res.headersSent) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[server] Unhandled rejection:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("[server] Uncaught exception:", err);
+  process.exit(1);
 });
 
 app.listen(env.PORT, () => {
