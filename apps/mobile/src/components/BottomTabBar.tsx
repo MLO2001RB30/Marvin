@@ -34,10 +34,29 @@ export function BottomTabBar({
           <Pressable
             key={tab.key}
             onPress={() => onTabPress(tab.key)}
-            style={{ alignItems: "center", gap: spacing.xxs, paddingVertical: spacing.xs, paddingHorizontal: spacing.sm, position: "relative" }}
+            style={({ pressed }) => ({
+              alignItems: "center",
+              gap: spacing.xxs,
+              paddingVertical: spacing.xs,
+              paddingHorizontal: spacing.sm,
+              position: "relative" as const,
+              opacity: pressed ? 0.6 : 1,
+              transform: [{ scale: pressed ? 0.95 : 1 }]
+            })}
           >
-            <View>
+            <View style={{ alignItems: "center" }}>
               <Feather name={tab.icon} size={icon.lg} color={tint} />
+              {isActive && (
+                <View
+                  style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: colors.accentGold,
+                    marginTop: 3
+                  }}
+                />
+              )}
               {badgeCount > 0 && (
                 <View
                   style={{

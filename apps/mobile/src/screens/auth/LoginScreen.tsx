@@ -44,7 +44,7 @@ export function LoginScreen() {
             style={{
               borderWidth: 1,
               borderColor: colors.border,
-              borderRadius: radius.card,
+              borderRadius: 12,
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
               color: colors.textPrimary
@@ -59,7 +59,7 @@ export function LoginScreen() {
             style={{
               borderWidth: 1,
               borderColor: colors.border,
-              borderRadius: radius.card,
+              borderRadius: 12,
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
               color: colors.textPrimary
