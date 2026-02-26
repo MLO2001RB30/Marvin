@@ -40,6 +40,7 @@ import { computeProductMetrics } from "./services/metricsService";
 import { getLatestDailyContext, upsertDailyContext } from "./services/contextSnapshotService";
 import { runDailyContextPipeline } from "./services/pipelineService";
 import { getLatestDailyBrief } from "./services/dailyBriefService";
+import { runDailyBriefForUser } from "./jobs/dailyBriefJob";
 import { startScheduler } from "./services/schedulerService";
 import { getSupabaseClient } from "./services/supabaseClient";
 import { transcribeAudioAttachment } from "./services/transcriptionService";
@@ -170,7 +171,15 @@ app.get("/v1/context/:userId/latest", async (req, res) => {
 app.post("/v1/context/:userId/pipeline/run", async (req, res) => {
   const { snapshot, traces } = await runDailyContextPipeline(req.params.userId);
   void logPipelineTrace(req.params.userId, traces, snapshot.id);
-  res.json({ snapshot, traces, dailyBrief: null });
+
+  let dailyBrief = null;
+  try {
+    dailyBrief = await runDailyBriefForUser(req.params.userId);
+  } catch (err) {
+    console.warn("[pipeline] Daily brief generation failed:", err);
+  }
+
+  res.json({ snapshot, traces, dailyBrief });
 });
 
 app.get("/v1/brief/:userId/daily", async (req, res) => {

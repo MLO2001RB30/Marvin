@@ -100,10 +100,6 @@ export async function answerAssistantQuestion(
     console.warn("[assistant] OPENAI_API_KEY not set in .env – using template answer. Add OPENAI_API_KEY to apps/api/.env");
     return buildTemplateAnswer(question, snapshot, recentRuns, attachments, audioTranscript);
   }
-  if (!snapshot) {
-    console.warn("[assistant] No daily context snapshot – using template. Run pipeline (pull-to-refresh on Brief) after connecting Slack.");
-    return buildTemplateAnswer(question, snapshot, recentRuns, attachments, audioTranscript);
-  }
 
   const userTimezone = timezoneOverride && isValidTimezone(timezoneOverride)
     ? timezoneOverride
@@ -122,7 +118,15 @@ export async function answerAssistantQuestion(
     envelopeJson = JSON.stringify(envelope);
   } catch (err) {
     console.warn("[assistant] Failed to build context envelope:", err);
-    return buildTemplateAnswer(question, snapshot, recentRuns, attachments, audioTranscript);
+    envelopeJson = JSON.stringify({
+      metadata: { user_id: userId, timezone: userTimezone, locale: "en", now_iso: new Date().toISOString() },
+      integrations: [],
+      outstanding_items: [],
+      calendar_today: [],
+      email_threads: [],
+      slack_messages: [],
+      workflow_runs_recent: []
+    });
   }
 
   const systemPrompts = [
@@ -173,11 +177,13 @@ export async function answerAssistantQuestion(
       return buildTemplateAnswer(question, snapshot, recentRuns, attachments, audioTranscript);
     }
 
-    const relatedRun = recentRuns.find((run) =>
-      (run.artifactRefs ?? []).some((ref) =>
-        snapshot.workflowArtifactRefs.some((snapshotRef) => snapshotRef.artifactId === ref.artifactId)
-      )
-    );
+    const relatedRun = snapshot
+      ? recentRuns.find((run) =>
+          (run.artifactRefs ?? []).some((ref) =>
+            snapshot.workflowArtifactRefs.some((snapshotRef) => snapshotRef.artifactId === ref.artifactId)
+          )
+        )
+      : undefined;
 
     return {
       question,
@@ -187,13 +193,15 @@ export async function answerAssistantQuestion(
         provider: item.provider,
         reason: item.explainWhy
       })),
-      contextReferences: [
-        {
-          snapshotId: snapshot.id,
-          workflowRunId: relatedRun?.id,
-          itemId: topItems[0]?.itemId
-        }
-      ],
+      contextReferences: snapshot
+        ? [
+            {
+              snapshotId: snapshot.id,
+              workflowRunId: relatedRun?.id,
+              itemId: topItems[0]?.itemId
+            }
+          ]
+        : [],
       recommendedActions: recommendedActions.length > 0 ? recommendedActions : undefined,
       attachmentsUsed: attachments,
       audioTranscript,

@@ -11,8 +11,8 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
-  OPENAI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
-  OPENAI_MODEL: z.string().default("gpt-4o-mini"),
+  OPENAI_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
+  OPENAI_MODEL: z.string().default("anthropic/claude-sonnet-4.5"),
   /** Fixed context injected into every assistant request (system prompt). Overrides file if set. */
   MARVIN_FIXED_CONTEXT: z.string().optional(),
   /** Path to core identity prompt file (relative to api root). Default: ai/prompts/core_identity_v1.txt */

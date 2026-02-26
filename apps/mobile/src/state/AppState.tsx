@@ -440,8 +440,9 @@ export function AppStateProvider({
       latestContext,
       dailyBrief,
       runContextPipelineNow: async () => {
-        const { snapshot } = await api.runContextPipeline();
+        const { snapshot, dailyBrief: brief } = await api.runContextPipeline();
         setLatestContext(snapshot);
+        if (brief) setDailyBrief(brief);
         const [{ runs }, { integrations }, { items }] = await Promise.all([
           api.listHistory(),
           api.listIntegrations(),

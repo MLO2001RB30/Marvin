@@ -101,12 +101,17 @@ export async function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
 
   while (iterations < MAX_TOOL_ITERATIONS) {
     iterations++;
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      "Content-Type": "application/json"
+    };
+    if (baseUrl.includes("openrouter.ai")) {
+      headers["HTTP-Referer"] = "https://marvin.app";
+      headers["X-Title"] = "Marvin";
+    }
     const response = await fetch(completionsUrl, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
+      headers,
       body: JSON.stringify(requestBody),
       signal: AbortSignal.timeout(LLM_TIMEOUT_MS)
     });

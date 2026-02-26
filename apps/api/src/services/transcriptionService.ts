@@ -24,6 +24,11 @@ export async function transcribeAudioAttachment(
     return fallbackTranscript(attachments);
   }
 
+  const isOpenRouter = env.OPENAI_BASE_URL.includes("openrouter.ai");
+  if (isOpenRouter) {
+    return fallbackTranscript(attachments);
+  }
+
   try {
     const buffer = Buffer.from(audio.base64, "base64");
     const formData = new FormData();
@@ -31,7 +36,8 @@ export async function transcribeAudioAttachment(
     formData.append("file", blob, audio.fileName ?? "voice-note.m4a");
     formData.append("model", env.OPENAI_AUDIO_MODEL);
 
-    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    const baseUrl = env.OPENAI_BASE_URL.replace(/\/+$/, "");
+    const response = await fetch(`${baseUrl}/audio/transcriptions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${env.OPENAI_API_KEY}`
