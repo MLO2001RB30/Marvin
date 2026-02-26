@@ -674,6 +674,7 @@ app.listen(env.PORT, () => {
   if (!llmApiKey) {
     console.warn("No LLM API key set – assistant will use template answers. Set CLAUDE_SONNET_4_5_API_KEY or OPENAI_API_KEY");
   } else {
-    console.info(`LLM configured: model=${env.OPENAI_MODEL} provider=${env.OPENAI_BASE_URL.includes("openrouter") ? "OpenRouter" : "direct"}`);
+    const resolvedModel = env.CLAUDE_SONNET_4_5_API_KEY ? "anthropic/claude-sonnet-4.5" : env.OPENAI_MODEL;
+    console.info(`LLM configured: model=${resolvedModel} provider=${env.OPENAI_BASE_URL.includes("openrouter") ? "OpenRouter" : "direct"} key=${env.CLAUDE_SONNET_4_5_API_KEY ? "CLAUDE_SONNET_4_5_API_KEY" : "OPENAI_API_KEY"}`);
   }
 });

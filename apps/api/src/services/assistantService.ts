@@ -162,15 +162,25 @@ export async function answerAssistantQuestion(
       userId
     });
 
-    const raw = result.content.trim();
+    let raw = result.content.trim();
+    const fenceMatch = raw.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/);
+    if (fenceMatch) raw = fenceMatch[1].trim();
+
     try {
       const parsed = JSON.parse(raw) as Record<string, unknown>;
 
       if (typeof parsed.display_type === "string" && typeof parsed.summary === "string") {
+        const rawItems = Array.isArray(parsed.items) ? parsed.items as Array<Record<string, unknown>> : undefined;
+        const cleanedItems = rawItems?.map((item) => ({
+          ...item,
+          channel: typeof item.channel === "string" && item.channel
+            ? item.channel.replace(/^#/, "") === "Email" || item.provider !== "slack" ? undefined : item.channel.replace(/^#/, "")
+            : undefined
+        }));
         structured = {
           display_type: parsed.display_type as StructuredAssistantResponse["display_type"],
           summary: parsed.summary,
-          items: Array.isArray(parsed.items) ? parsed.items : undefined,
+          items: cleanedItems as StructuredAssistantResponse["items"],
           events: Array.isArray(parsed.events) ? parsed.events : undefined,
           action_status: parsed.action_status as "success" | "failed" | undefined,
           action_description: typeof parsed.action_description === "string" ? parsed.action_description : undefined,

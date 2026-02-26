@@ -38,7 +38,10 @@ export async function runDailyBriefForUser(userId: string): Promise<DailyBriefJs
       userId
     });
 
-    const raw = result.content.trim();
+    let raw = result.content.trim();
+    const fenceMatch = raw.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/);
+    if (fenceMatch) raw = fenceMatch[1].trim();
+
     let brief: DailyBriefJson;
     try {
       brief = JSON.parse(raw) as DailyBriefJson;

@@ -48,6 +48,11 @@ function resolveApiKey(): string | undefined {
   return env.CLAUDE_SONNET_4_5_API_KEY || env.OPENAI_API_KEY;
 }
 
+function resolveModel(): string {
+  if (env.CLAUDE_SONNET_4_5_API_KEY) return "anthropic/claude-sonnet-4.5";
+  return env.OPENAI_MODEL;
+}
+
 export async function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
   const {
     systemPrompts,
@@ -83,7 +88,7 @@ export async function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
   messages.push({ role: "user", content: userContent });
 
   const requestBody: Record<string, unknown> = {
-    model: env.OPENAI_MODEL,
+    model: resolveModel(),
     temperature: 0.3,
     messages
   };
