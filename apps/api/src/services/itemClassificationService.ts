@@ -61,7 +61,7 @@ Score: 90-100=critical/blocking, 70-89=important/time-sensitive, 40-69=normal, 0
           }
         ]
       }),
-      signal: AbortSignal.timeout(20000)
+      signal: AbortSignal.timeout(45000)
     });
 
     if (!res.ok) return;
