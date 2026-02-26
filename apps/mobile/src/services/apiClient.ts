@@ -262,6 +262,18 @@ export function createApiClient({ userId, accessToken }: ApiClientOptions) {
         `/v1/notifications/${userId}/register`,
         { method: "POST", body: JSON.stringify({ token, platform }) },
         accessToken
-      )
+      ),
+    streamAssistant: (question: string, chatId?: string, timezone?: string) => {
+      const params = new URLSearchParams({ q: question });
+      if (chatId) params.set("chatId", chatId);
+      if (timezone) params.set("tz", timezone);
+      const url = `${apiBaseUrl}/v1/assistant/${userId}/stream?${params.toString()}`;
+      return {
+        url,
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      };
+    }
   };
 }

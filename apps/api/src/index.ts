@@ -414,6 +414,96 @@ app.get("/v1/digest/:userId", async (req, res) => {
   res.json({ digest });
 });
 
+app.get("/v1/assistant/:userId/stream", async (req, res) => {
+  const question = typeof req.query.q === "string" ? req.query.q : "";
+  if (!question.trim()) {
+    res.status(400).json({ error: "q parameter required" });
+    return;
+  }
+
+  const chatId = typeof req.query.chatId === "string" ? req.query.chatId : undefined;
+  const timezone = typeof req.query.tz === "string" ? req.query.tz : undefined;
+  const userId = req.params.userId;
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no"
+  });
+
+  const sendSSE = (event: string, data: unknown) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    sendSSE("status", { status: "thinking", message: "Analyzing your request..." });
+
+    const { streamLLM } = await import("./ai/llm/stream");
+    const { loadCoreIdentityPrompt, loadModePrompt } = await import("./ai/loadPrompts");
+    const { buildContextEnvelope } = await import("./ai/context/buildContextEnvelope");
+    const { getUserTimezone } = await import("./services/userProfileService");
+    const { listUserMemories, buildMemoryPromptSection } = await import("./services/userMemoryService");
+
+    const userTimezone = timezone ?? (await getUserTimezone(userId));
+    const today = new Date().toISOString().slice(0, 10);
+    const todayDay = new Date().toLocaleDateString("en-US", { weekday: "long" });
+
+    sendSSE("status", { status: "context", message: "Building context..." });
+
+    let envelopeJson: string;
+    try {
+      const envelope = await buildContextEnvelope(userId, "assistant", { timezone: userTimezone });
+      envelopeJson = JSON.stringify(envelope);
+    } catch {
+      envelopeJson = JSON.stringify({
+        metadata: { user_id: userId, timezone: userTimezone, locale: "en", now_iso: new Date().toISOString() },
+        integrations: [], outstanding_items: [], calendar_today: [], email_threads: [], slack_messages: [], workflow_runs_recent: []
+      });
+    }
+
+    const memories = await listUserMemories(userId);
+    const memorySection = buildMemoryPromptSection(memories);
+
+    const systemPrompts = [
+      loadCoreIdentityPrompt(),
+      loadModePrompt("ASSISTANT_QA_GROUNDED_v1"),
+      `Date context: Today is ${today} (${todayDay}). User timezone: ${userTimezone}.`,
+      ...(memorySection ? [memorySection] : [])
+    ];
+
+    sendSSE("status", { status: "streaming", message: "Generating response..." });
+
+    await streamLLM(
+      {
+        systemPrompts,
+        contextEnvelopeJson: envelopeJson,
+        userContent: `User question: ${question}`,
+        mode: "ASSISTANT_QA_GROUNDED",
+        responseFormat: "json_object"
+      },
+      {
+        onToken: (token) => {
+          sendSSE("token", { token });
+        },
+        onToolStatus: (status) => {
+          sendSSE("status", { status: "tool", message: status });
+        },
+        onDone: (fullContent, usage) => {
+          sendSSE("done", { content: fullContent, usage });
+        },
+        onError: (error) => {
+          sendSSE("error", { message: error.message });
+        }
+      }
+    );
+  } catch (err) {
+    sendSSE("error", { message: err instanceof Error ? err.message : "Stream failed" });
+  } finally {
+    res.end();
+  }
+});
+
 app.post("/v1/assistant/:userId/query", async (req, res) => {
   const payload = req.body as AssistantQueryRequest;
   const attachments = payload.attachments ?? [];
