@@ -20,7 +20,6 @@ export interface CallLLMOptions {
   systemPrompts: string[];
   contextEnvelopeJson?: string;
   userContent: string;
-  /** Prior chat messages (user/assistant pairs) to include before userContent */
   chatHistory?: ChatMessage[];
   tools?: OpenAITool[];
   executeTool?: (name: string, args: Record<string, unknown>) => Promise<string>;
@@ -28,7 +27,6 @@ export interface CallLLMOptions {
   coreVersion?: string;
   modeVersion?: string;
   responseFormat?: "json_object" | "text";
-  /** Optional: for audit logging */
   userId?: string;
 }
 
@@ -42,6 +40,9 @@ export interface CallLLMResult {
 function sha256Hex(input: string): string {
   return createHash("sha256").update(input, "utf8").digest("hex");
 }
+
+const LLM_TIMEOUT_MS = 60_000;
+const MAX_TOOL_ITERATIONS = 3;
 
 export async function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
   const {
@@ -61,18 +62,17 @@ export async function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
   const startMs = Date.now();
   const toolCallsLog: Array<{ name: string; args: Record<string, unknown>; result: string }> = [];
 
-  const systemParts: string[] = [...systemPrompts];
-  if (contextEnvelopeJson) {
-    systemParts.push(`CONTEXT_ENVELOPE:\n${contextEnvelopeJson}`);
-  }
+  const systemContent = contextEnvelopeJson
+    ? [...systemPrompts, `CONTEXT_ENVELOPE:\n${contextEnvelopeJson}`].join("\n\n")
+    : systemPrompts.join("\n\n");
 
   type Message =
     | { role: "system"; content: string }
     | { role: "user"; content: string }
-    | { role: "assistant"; content: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> }
+    | { role: "assistant"; content: string; tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> }
     | { role: "tool"; tool_call_id: string; content: string };
 
-  const messages: Message[] = systemParts.map((content) => ({ role: "system" as const, content }));
+  const messages: Message[] = [{ role: "system", content: systemContent }];
   for (const msg of chatHistory) {
     messages.push({ role: msg.role, content: msg.content });
   }
@@ -90,26 +90,30 @@ export async function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
     requestBody.response_format = { type: responseFormat };
   }
 
+  const baseUrl = env.OPENAI_BASE_URL.replace(/\/+$/, "");
+  const completionsUrl = `${baseUrl}/chat/completions`;
+
   const contextHash = contextEnvelopeJson ? sha256Hex(contextEnvelopeJson).slice(0, 16) : "none";
+  let lastUsage: CallLLMResult["usage"];
 
   let iterations = 0;
-  const maxIterations = 5;
   let lastContent = "";
 
-  while (iterations < maxIterations) {
+  while (iterations < MAX_TOOL_ITERATIONS) {
     iterations++;
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(completionsUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${env.OPENAI_API_KEY}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(LLM_TIMEOUT_MS)
     });
 
     if (!response.ok) {
       const errBody = await response.text();
-      throw new Error(`OpenAI API error ${response.status}: ${errBody.slice(0, 200)}`);
+      throw new Error(`LLM API error ${response.status}: ${errBody.slice(0, 300)}`);
     }
 
     const payload = (await response.json()) as {
@@ -118,6 +122,7 @@ export async function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
           content?: string;
           tool_calls?: Array<{
             id: string;
+            type: "function";
             function: { name: string; arguments: string };
           }>;
         };
@@ -127,7 +132,11 @@ export async function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
 
     const choice = payload.choices?.[0]?.message;
     if (!choice) {
-      throw new Error("OpenAI returned empty message");
+      throw new Error("LLM returned empty message");
+    }
+
+    if (payload.usage) {
+      lastUsage = payload.usage;
     }
 
     lastContent = choice.content ?? "";
@@ -150,44 +159,39 @@ export async function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
       break;
     }
 
-    for (const tc of toolCalls) {
-      let result: string;
-      try {
-        const args = JSON.parse(tc.function.arguments || "{}") as Record<string, unknown>;
-        result = await executeTool(tc.function.name, args);
+    const toolResults = await Promise.all(
+      toolCalls.map(async (tc) => {
+        let result: string;
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(tc.function.arguments || "{}") as Record<string, unknown>;
+          result = await executeTool(tc.function.name, args);
+        } catch (err) {
+          result = JSON.stringify({
+            error: err instanceof Error ? err.message : "Tool execution failed"
+          });
+        }
         toolCallsLog.push({ name: tc.function.name, args, result });
-      } catch (err) {
-        result = JSON.stringify({
-          error: err instanceof Error ? err.message : "Tool execution failed"
-        });
-        toolCallsLog.push({
-          name: tc.function.name,
-          args: {},
-          result
-        });
-      }
+        return { tool_call_id: tc.id, content: result };
+      })
+    );
+
+    for (const tr of toolResults) {
       (requestBody.messages as Message[]).push({
         role: "tool",
-        tool_call_id: tc.id,
-        content: result
+        tool_call_id: tr.tool_call_id,
+        content: tr.content
       });
     }
   }
 
   const latencyMs = Date.now() - startMs;
 
+  const usageStr = lastUsage
+    ? `in=${lastUsage.prompt_tokens ?? "?"} out=${lastUsage.completion_tokens ?? "?"}`
+    : "no-usage";
   console.info(
-    "[llm]",
-    "mode=",
-    mode,
-    "core=",
-    coreVersion,
-    "ctx_hash=",
-    contextHash,
-    "tools=",
-    toolCallsLog.length,
-    "latency_ms=",
-    latencyMs
+    `[llm] ${mode} iter=${iterations} tools=${toolCallsLog.length} ${usageStr} ${latencyMs}ms`
   );
 
   if (userId) {
@@ -195,10 +199,11 @@ export async function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
     void logLLMCall({
       userId,
       coreVersion,
-      modeVersion: modeVersion,
+      modeVersion,
       mode,
       contextHash,
       toolCalls: toolCallsLog.map((t) => ({ name: t.name, args: t.args })),
+      tokenUsage: lastUsage,
       latencyMs
     });
   }
@@ -206,7 +211,7 @@ export async function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
   return {
     content: lastContent,
     toolCalls: toolCallsLog,
-    usage: undefined,
+    usage: lastUsage,
     latencyMs
   };
 }

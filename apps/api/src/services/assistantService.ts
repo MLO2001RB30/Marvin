@@ -14,7 +14,7 @@ import { env } from "../config/env";
 import { loadCoreIdentityPrompt, loadModePrompt } from "../ai/loadPrompts";
 import { buildContextEnvelope } from "../ai/context/buildContextEnvelope";
 import { callLLM } from "../ai/llm/client";
-import { executeTool as executeToolFromRegistry, getAssistantTools } from "../ai/tools/registry";
+import { createToolExecutor, getAssistantTools } from "../ai/tools/registry";
 import { getUserTimezone } from "./userProfileService";
 
 function isValidTimezone(tz: string): boolean {
@@ -105,13 +105,20 @@ export async function answerAssistantQuestion(
     return buildTemplateAnswer(question, snapshot, recentRuns, attachments, audioTranscript);
   }
 
-  const userTimezone = await getUserTimezone(userId);
+  const userTimezone = timezoneOverride && isValidTimezone(timezoneOverride)
+    ? timezoneOverride
+    : await getUserTimezone(userId);
   const today = new Date().toISOString().slice(0, 10);
   const todayDay = new Date().toLocaleDateString("en-US", { weekday: "long" });
 
   let envelopeJson: string;
   try {
-    const envelope = await buildContextEnvelope(userId, "assistant", { externalItems });
+    const envelope = await buildContextEnvelope(userId, "assistant", {
+      externalItems,
+      snapshot,
+      runs: recentRuns.map((r) => ({ id: r.id, workflowId: r.workflowId, status: r.status })),
+      timezone: userTimezone
+    });
     envelopeJson = JSON.stringify(envelope);
   } catch (err) {
     console.warn("[assistant] Failed to build context envelope:", err);
@@ -142,7 +149,7 @@ export async function answerAssistantQuestion(
       userContent,
       chatHistory: chatHistory.map((m) => ({ role: m.role, content: m.text })),
       tools: getAssistantTools(userTimezone),
-      executeTool: (name, args) => executeToolFromRegistry(userId, name, args),
+      executeTool: createToolExecutor(userId, userTimezone),
       mode: "ASSISTANT_QA_GROUNDED",
       responseFormat: "json_object",
       userId

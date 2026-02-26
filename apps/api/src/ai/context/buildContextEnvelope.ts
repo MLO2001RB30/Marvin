@@ -26,10 +26,11 @@ function parseCalendarTimesFromSummary(summary: string): { start: string; end: s
 }
 
 export interface BuildContextEnvelopeOptions {
-  /** Pre-fetched external items (avoids duplicate fetch when caller already has them) */
   externalItems?: ExternalItem[];
-  /** Pre-fetched daily brief from daily_briefs table (when available) */
   dailyBrief?: { headline: string; top_priorities: Array<{ title: string; why: string; next_step: string }> };
+  snapshot?: DailyContextSnapshot | null;
+  runs?: Array<{ id: string; workflowId: string; status: string }>;
+  timezone?: string;
 }
 
 export async function buildContextEnvelope(
@@ -40,13 +41,25 @@ export async function buildContextEnvelope(
   const nowIso = new Date().toISOString();
   const today = nowIso.slice(0, 10);
 
-  const [integrations, items, snapshot, runs, timezone] = await Promise.all([
-    listIntegrationAccounts(userId),
-    options.externalItems ?? listExternalItems(userId),
-    getLatestDailyContext(userId),
-    listWorkflowRuns(userId),
-    getUserTimezone(userId)
-  ]);
+  const needsIntegrations = true;
+  const needsItems = !options.externalItems;
+  const needsSnapshot = options.snapshot === undefined;
+  const needsRuns = !options.runs;
+  const needsTimezone = !options.timezone;
+
+  const [integrations, fetchedItems, fetchedSnapshot, fetchedRuns, fetchedTimezone] =
+    await Promise.all([
+      needsIntegrations ? listIntegrationAccounts(userId) : Promise.resolve([]),
+      needsItems ? listExternalItems(userId) : Promise.resolve([]),
+      needsSnapshot ? getLatestDailyContext(userId) : Promise.resolve(null),
+      needsRuns ? listWorkflowRuns(userId) : Promise.resolve([]),
+      needsTimezone ? getUserTimezone(userId) : Promise.resolve("UTC")
+    ]);
+
+  const items = options.externalItems ?? fetchedItems;
+  const snapshot = options.snapshot !== undefined ? options.snapshot : fetchedSnapshot;
+  const runs = options.runs ?? fetchedRuns.map((r) => ({ id: r.id, workflowId: r.workflowId, status: r.status }));
+  const timezone = options.timezone ?? fetchedTimezone;
 
   const connectedProviders = new Set(
     integrations.filter((a) => a.status === "connected").map((a) => a.provider)
