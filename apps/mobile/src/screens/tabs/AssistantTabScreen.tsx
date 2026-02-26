@@ -88,21 +88,19 @@ function buildSuggestedPrompts(
   outstandingItems: { title: string }[],
   topBlockers: string[],
   hasWorkflows: boolean
-): [string, string] {
+): string[] {
+  const prompts: string[] = [];
+  prompts.push("What's on my calendar today?");
   if (topBlockers.length > 0) {
     const blocker = sanitizeForDisplay(topBlockers[0]);
     const project = blocker.length > 25 ? "progress" : blocker.replace(/\.$/, "");
-    return [`What's blocking ${project}?`, "How should I prioritize this afternoon?"];
+    prompts.push(`What's blocking ${project}?`);
   }
   if (outstandingItems.length > 0) {
-    const first = sanitizeForDisplay(outstandingItems[0].title);
-    const topic = first.length > 20 ? first.slice(0, 20) + "…" : first;
-    return [`Draft a follow-up about ${topic}`, "How should I prioritize this afternoon?"];
+    prompts.push("What needs my reply?");
   }
-  if (hasWorkflows) {
-    return ["How should I prioritize this afternoon?", "Set new workflow"];
-  }
-  return ["Summarize emails/deadlines", "Set new workflow"];
+  prompts.push("How should I prioritize today?");
+  return prompts.slice(0, 4);
 }
 
 const SLACK_ICON = require("../../../assets/images/slack.png");
@@ -552,7 +550,7 @@ export function AssistantTabScreen() {
     topBlockers,
     workflows.filter((w) => w.enabled).length
   );
-  const [promptA, promptB] = buildSuggestedPrompts(
+  const suggestedPrompts = buildSuggestedPrompts(
     outstandingItems,
     topBlockers,
     workflows.length > 0
@@ -1003,47 +1001,32 @@ export function AssistantTabScreen() {
               bottom: 8,
               zIndex: 5,
               flexDirection: "row",
+              flexWrap: "wrap",
               gap: spacing.xs,
               backgroundColor: colors.bgPage
             }}
           >
-            <Pressable
-              onPress={() => {
-                setText(promptA);
-                setTimeout(() => inputRef.current?.focus(), 50);
-              }}
-              style={{
-                flex: 1,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: radius.pill,
-                backgroundColor: colors.bgSurface,
-                paddingVertical: spacing.xs,
-                paddingHorizontal: spacing.sm
-              }}
-            >
-              <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }} numberOfLines={1}>
-                {promptA}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                setText(promptB);
-                setTimeout(() => inputRef.current?.focus(), 50);
-              }}
-              style={{
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: radius.pill,
-                backgroundColor: colors.bgSurface,
-                paddingVertical: spacing.xs,
-                paddingHorizontal: spacing.sm
-              }}
-            >
-              <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}>
-                {promptB}
-              </Text>
-            </Pressable>
+            {suggestedPrompts.map((prompt, idx) => (
+              <Pressable
+                key={idx}
+                onPress={() => {
+                  setText(prompt);
+                  setTimeout(() => inputRef.current?.focus(), 50);
+                }}
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: radius.pill,
+                  backgroundColor: colors.bgSurface,
+                  paddingVertical: spacing.xs,
+                  paddingHorizontal: spacing.sm
+                }}
+              >
+                <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }} numberOfLines={1}>
+                  {prompt}
+                </Text>
+              </Pressable>
+            ))}
           </View>
         ) : null}
 

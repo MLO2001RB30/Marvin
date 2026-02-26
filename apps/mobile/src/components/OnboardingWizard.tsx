@@ -1,19 +1,23 @@
-import { Pressable, Text, View } from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { Image, Pressable, Text, View } from "react-native";
 
 import type { IntegrationProvider } from "@pia/shared";
 
 import { useTheme } from "../theme/ThemeProvider";
 
-const mvpProviders: IntegrationProvider[] = [
-  "gmail",
-  "google_calendar",
-  "healthkit",
-  "weatherkit"
+const STEPS = [
+  { title: "Welcome to Marvin", icon: "zap" as const },
+  { title: "Connect your tools", icon: "link" as const },
+  { title: "Your data stays safe", icon: "shield" as const },
+  { title: "See your first brief", icon: "sunrise" as const }
 ];
 
-function providerLabel(provider: IntegrationProvider) {
-  return provider.replace("_", " ");
-}
+const connectProviders: { provider: IntegrationProvider; label: string; icon: string }[] = [
+  { provider: "gmail", label: "Gmail", icon: "mail" },
+  { provider: "google_calendar", label: "Calendar", icon: "calendar" },
+  { provider: "slack", label: "Slack", icon: "message-square" },
+  { provider: "google_drive", label: "Drive", icon: "hard-drive" }
+];
 
 export function OnboardingWizard({
   step,
@@ -36,144 +40,159 @@ export function OnboardingWizard({
 }) {
   const { colors, spacing, typography } = useTheme();
   return (
-    <View style={{ gap: spacing.section }}>
-      <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.hero }}>
-        Get started
-      </Text>
-      {step === 0 ? (
+    <View style={{ gap: spacing.xl, flex: 1 }}>
+      <View style={{ flexDirection: "row", gap: spacing.xs, alignItems: "center" }}>
+        {STEPS.map((s, idx) => (
+          <View
+            key={idx}
+            style={{
+              flex: 1,
+              height: 3,
+              borderRadius: 2,
+              backgroundColor: idx <= step ? colors.accentGold : colors.border
+            }}
+          />
+        ))}
+      </View>
+
+      <View style={{ alignItems: "center", gap: spacing.md }}>
+        <View
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            backgroundColor: colors.accentGoldTint,
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+        >
+          <Feather name={STEPS[step].icon} size={24} color={colors.accentGold} />
+        </View>
+        <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.xl, fontWeight: "600", textAlign: "center" }}>
+          {STEPS[step].title}
+        </Text>
+      </View>
+
+      {step === 0 && (
         <View style={{ gap: spacing.sm }}>
-          <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md }}>
-            Marvin captures signals, reasons over priority and energy, then executes through workflows.
-          </Text>
-          <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.sm }}>
-            You can start in demo mode now and connect integrations later.
+          <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.md, lineHeight: 22, textAlign: "center" }}>
+            Marvin connects your email, calendar, and messaging to surface what matters most — so you can focus on what counts.
           </Text>
         </View>
-      ) : null}
+      )}
 
-      {step === 1 ? (
-        <View style={{ gap: spacing.sm }}>
-          <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md }}>
-            Connect providers (optional)
+      {step === 1 && (
+        <View style={{ gap: spacing.md }}>
+          <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.md, textAlign: "center" }}>
+            Connect at least one integration to get started.
           </Text>
-          <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.sm }}>
-            Start with one provider or skip and run the first pipeline in demo mode.
-          </Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>
-            {mvpProviders.map((provider) => (
+          <View style={{ gap: spacing.xs }}>
+            {connectProviders.map(({ provider, label, icon }) => (
               <Pressable
                 key={provider}
                 onPress={() => onConnectProvider(provider)}
                 style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing.sm,
                   borderWidth: 1,
                   borderColor: colors.border,
-                  borderRadius: 999,
+                  borderRadius: 14,
                   paddingHorizontal: spacing.md,
-                  paddingVertical: spacing.xs
+                  paddingVertical: spacing.sm,
+                  backgroundColor: colors.bgSurface
                 }}
               >
-                <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm }}>
-                  Connect {providerLabel(provider)}
+                <Feather name={icon as any} size={20} color={colors.accentGold} />
+                <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md, flex: 1 }}>
+                  {label}
                 </Text>
+                <Feather name="chevron-right" size={16} color={colors.textTertiary} />
               </Pressable>
             ))}
           </View>
         </View>
-      ) : null}
+      )}
 
-      {step === 2 ? (
+      {step === 2 && (
         <View style={{ gap: spacing.sm }}>
-          <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md }}>
-            Privacy first
-          </Text>
-          <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.sm }}>
-            Sensitive content stays local-first where possible. Cloud reasoning uses metadata/embeddings with revocable per-provider consent.
-          </Text>
-        </View>
-      ) : null}
-
-      {step === 3 ? (
-        <View style={{ gap: spacing.sm }}>
-          <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md }}>
-            Run your first daily context
-          </Text>
-          <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.sm }}>
-            Generate your first morning brief from connected integrations or demo fallback data.
-          </Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>
-            <Pressable
-              onPress={onRunDemo}
-              style={{
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 999,
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.xs
-              }}
-            >
-              <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm }}>
-                {isBusy ? "Running..." : "Run in demo mode"}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={onRunConnected}
-              style={{
-                borderWidth: 1,
-                borderColor: colors.accentGold,
-                borderRadius: 999,
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.xs
-              }}
-            >
-              <Text style={{ color: colors.accentGold, fontSize: typography.sizes.sm }}>
-                {isBusy ? "Running..." : "Run with connected accounts"}
-              </Text>
-            </Pressable>
+          <View style={{ flexDirection: "row", gap: spacing.sm, alignItems: "flex-start" }}>
+            <Feather name="lock" size={16} color={colors.success} style={{ marginTop: 3 }} />
+            <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.md, flex: 1, lineHeight: 22 }}>
+              Sensitive content stays local-first. Cloud reasoning uses metadata only with revocable per-provider consent.
+            </Text>
+          </View>
+          <View style={{ flexDirection: "row", gap: spacing.sm, alignItems: "flex-start" }}>
+            <Feather name="eye-off" size={16} color={colors.success} style={{ marginTop: 3 }} />
+            <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.md, flex: 1, lineHeight: 22 }}>
+              You can disconnect any integration at any time from Settings.
+            </Text>
           </View>
         </View>
-      ) : null}
+      )}
 
-      <View style={{ flexDirection: "row", gap: spacing.xs, flexWrap: "wrap" }}>
+      {step === 3 && (
+        <View style={{ gap: spacing.md }}>
+          <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.md, textAlign: "center" }}>
+            Generate your first brief from connected integrations.
+          </Text>
+          <Pressable
+            onPress={onRunConnected}
+            disabled={isBusy}
+            style={{
+              backgroundColor: colors.accentGold,
+              borderRadius: 14,
+              paddingVertical: spacing.sm,
+              alignItems: "center",
+              opacity: isBusy ? 0.6 : 1
+            }}
+          >
+            <Text style={{ color: "#1A1A1C", fontSize: typography.sizes.md, fontWeight: "600" }}>
+              {isBusy ? "Building your brief..." : "Build my brief"}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={onRunDemo}
+            disabled={isBusy}
+            style={{ alignItems: "center", paddingVertical: spacing.xs }}
+          >
+            <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.sm }}>
+              or try with demo data
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
+      <View style={{ flex: 1 }} />
+
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingBottom: spacing.lg }}>
         {step > 0 ? (
-          <Pressable
-            onPress={onBack}
-            style={{
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 999,
-              paddingHorizontal: spacing.md,
-              paddingVertical: spacing.xs
-            }}
-          >
-            <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm }}>Back</Text>
+          <Pressable onPress={onBack} style={{ padding: spacing.xs }}>
+            <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.md }}>Back</Text>
           </Pressable>
-        ) : null}
-        {step < 3 ? (
-          <Pressable
-            onPress={onNext}
-            style={{
-              borderWidth: 1,
-              borderColor: colors.accentGold,
-              borderRadius: 999,
-              paddingHorizontal: spacing.md,
-              paddingVertical: spacing.xs
-            }}
-          >
-            <Text style={{ color: colors.accentGold, fontSize: typography.sizes.sm }}>Continue</Text>
+        ) : (
+          <View />
+        )}
+        <View style={{ flexDirection: "row", gap: spacing.md }}>
+          <Pressable onPress={onSkip} style={{ padding: spacing.xs }}>
+            <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.sm }}>Skip</Text>
           </Pressable>
-        ) : null}
-        <Pressable
-          onPress={onSkip}
-          style={{
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: 999,
-            paddingHorizontal: spacing.md,
-            paddingVertical: spacing.xs
-          }}
-        >
-          <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.sm }}>Skip</Text>
-        </Pressable>
+          {step < 3 && (
+            <Pressable
+              onPress={onNext}
+              style={{
+                backgroundColor: colors.accentGold,
+                borderRadius: 10,
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.xs
+              }}
+            >
+              <Text style={{ color: "#1A1A1C", fontSize: typography.sizes.sm, fontWeight: "600" }}>
+                Continue
+              </Text>
+            </Pressable>
+          )}
+        </View>
       </View>
     </View>
   );

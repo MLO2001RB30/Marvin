@@ -3,9 +3,11 @@ import {
   Image,
   ImageSourcePropType,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View,
   useWindowDimensions
 } from "react-native";
@@ -13,6 +15,16 @@ import { Feather } from "@expo/vector-icons";
 
 import type { ExternalItem, IntegrationProvider, OutstandingItem } from "@pia/shared";
 import { slackEmojiToUnicode } from "@pia/shared";
+
+function triggerHaptic() {
+  try {
+    if (Platform.OS === "web") return;
+    const Haptics = require("expo-haptics");
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  } catch {
+    // Haptics not available
+  }
+}
 
 import { AppHeader } from "../../components/AppHeader";
 import { EmptyStateCard } from "../../components/EmptyStateCard";
@@ -156,7 +168,13 @@ export function BriefTabScreen() {
   const [selectedItem, setSelectedItem] = useState<OpenItem | null>(null);
   const [doneFolderExpanded, setDoneFolderExpanded] = useState(false);
   const [selectedItemFromDone, setSelectedItemFromDone] = useState(false);
-  const { itemStatuses, setItemStatus, getItemStatus } = useItemStatuses(user?.id ?? "");
+  const [replyText, setReplyText] = useState("");
+  const { itemStatuses, setItemStatus: rawSetItemStatus, getItemStatus } = useItemStatuses(user?.id ?? "");
+
+  const setItemStatus = (id: string, status: import("../../hooks/useItemStatuses").ItemStatus) => {
+    triggerHaptic();
+    rawSetItemStatus(id, status);
+  };
 
   const isFirstTime = !latestContext && integrationAccounts.filter((a) => a.status === "connected").length === 0;
   const digestItems = latestContext?.outstandingItems ?? latestContext?.digest?.items ?? [];
@@ -179,21 +197,48 @@ export function BriefTabScreen() {
   const hasOpenItems = openItems.length > 0;
   const { height: screenHeight } = useWindowDimensions();
 
-  const itemsByProvider = openItems.reduce(
+  type UrgencyKey = "needs_reply" | "time_sensitive" | "review";
+  const URGENCY_LABELS: Record<UrgencyKey, string> = {
+    needs_reply: "Needs reply",
+    time_sensitive: "Time-sensitive",
+    review: "Review"
+  };
+  const URGENCY_ICONS: Record<UrgencyKey, "message-circle" | "clock" | "inbox"> = {
+    needs_reply: "message-circle",
+    time_sensitive: "clock",
+    review: "inbox"
+  };
+  const URGENCY_COLORS: Record<UrgencyKey, string> = {
+    needs_reply: colors.danger,
+    time_sensitive: colors.accentGold,
+    review: colors.textSecondary
+  };
+
+  const itemsByUrgency = openItems.reduce(
     (acc, item) => {
-      const p = item.provider;
-      if (!acc[p]) acc[p] = [];
-      acc[p].push(item);
+      const ext = externalItems.find((e) => e.id === item.id);
+      let urgency: UrgencyKey = "review";
+      if (ext?.requiresReply) urgency = "needs_reply";
+      else if (ext?.provider === "google_calendar") urgency = "time_sensitive";
+      else if (ext?.tags?.includes("urgent")) urgency = "time_sensitive";
+      if (!acc[urgency]) acc[urgency] = [];
+      acc[urgency].push(item);
       return acc;
     },
-    {} as Record<IntegrationProvider, OpenItem[]>
+    {} as Record<UrgencyKey, OpenItem[]>
   );
 
-  const cohorts = COHORT_ORDER.filter((p) => (itemsByProvider[p]?.length ?? 0) > 0).map((provider) => ({
-    provider,
-    items: (itemsByProvider[provider] ?? []).slice(0, 5),
-    totalCount: itemsByProvider[provider]?.length ?? 0
-  }));
+  const urgencyOrder: UrgencyKey[] = ["needs_reply", "time_sensitive", "review"];
+  const cohorts = urgencyOrder
+    .filter((u) => (itemsByUrgency[u]?.length ?? 0) > 0)
+    .map((urgency) => ({
+      urgency,
+      label: URGENCY_LABELS[urgency],
+      icon: URGENCY_ICONS[urgency],
+      color: URGENCY_COLORS[urgency],
+      items: (itemsByUrgency[urgency] ?? []).slice(0, 5),
+      totalCount: itemsByUrgency[urgency]?.length ?? 0
+    }));
 
   const CARD_HEIGHT = 88;
   const stackHeightFor = (n: number) => CARD_HEIGHT * (1 + 0.2 * Math.max(0, n - 1));
@@ -247,16 +292,39 @@ export function BriefTabScreen() {
                   Today ({calendarToday.length})
                 </Text>
               </View>
-              {calendarToday.map((event) => (
-                <View key={event.id} style={{ flexDirection: "row", gap: spacing.sm, paddingVertical: spacing.xs }}>
-                  <Text style={{ color: colors.accentGold, fontSize: typography.sizes.xs, width: 44 }}>
-                    {event.summary?.match(/T(\d{2}:\d{2})/)?.[1] ?? ""}
-                  </Text>
-                  <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm, flex: 1 }} numberOfLines={1}>
-                    {event.title}
-                  </Text>
-                </View>
-              ))}
+              {calendarToday.map((event, idx) => {
+                const time = event.summary?.match(/T(\d{2}:\d{2})/)?.[1] ?? "";
+                const endTime = event.summary?.match(/[–-]\s*[\d-]+T(\d{2}:\d{2})/)?.[1] ?? "";
+                return (
+                  <View key={event.id} style={{ flexDirection: "row", gap: spacing.sm, alignItems: "stretch" }}>
+                    <View style={{ alignItems: "center", width: 44 }}>
+                      <Text style={{ color: colors.accentGold, fontSize: typography.sizes.xs, fontWeight: "600" }}>
+                        {time}
+                      </Text>
+                      {endTime && (
+                        <Text style={{ color: colors.textTertiary, fontSize: 9 }}>{endTime}</Text>
+                      )}
+                    </View>
+                    <View style={{ width: 2, backgroundColor: colors.accentGold, borderRadius: 1, marginVertical: 2, opacity: 0.4 }} />
+                    <View
+                      style={{
+                        flex: 1,
+                        backgroundColor: colors.bgSurface,
+                        borderRadius: 10,
+                        paddingHorizontal: spacing.sm,
+                        paddingVertical: spacing.xs,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        marginBottom: idx < calendarToday.length - 1 ? spacing.xxs : 0
+                      }}
+                    >
+                      <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.sm }} numberOfLines={1}>
+                        {event.title}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           )}
 
@@ -351,21 +419,14 @@ export function BriefTabScreen() {
           </View>
         ) : (
           <View style={{ gap: spacing.lg }}>
-            {cohorts.map(({ provider, items, totalCount }) => {
+            {cohorts.map(({ urgency, label, icon: urgencyIcon, color: urgencyColor, items, totalCount }) => {
               const stackHeight = stackHeightFor(items.length);
-              const displayName = PROVIDER_DISPLAY_NAMES[provider] ?? provider;
               return (
-                <View key={provider} style={{ gap: spacing.xs }}>
+                <View key={urgency} style={{ gap: spacing.xs }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
-                    {providerLogos[provider] ? (
-                      <Image
-                        source={providerLogos[provider]!}
-                        style={{ width: 20, height: 20, borderRadius: 6 }}
-                        resizeMode="contain"
-                      />
-                    ) : null}
-                    <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: "600" }}>
-                      {displayName} ({totalCount})
+                    <Feather name={urgencyIcon} size={16} color={urgencyColor} />
+                    <Text style={{ color: urgencyColor, fontSize: typography.sizes.sm, fontWeight: "600" }}>
+                      {label} ({totalCount})
                     </Text>
                   </View>
                   <View style={{ height: stackHeight, position: "relative" }}>
@@ -382,6 +443,9 @@ export function BriefTabScreen() {
                           onPress={() => {
                             setSelectedItem(item);
                             setSelectedItemFromDone(false);
+                          }}
+                          onLongPress={() => {
+                            setItemStatus(item.id, "done");
                           }}
                           style={{
                             position: "absolute",
@@ -431,6 +495,16 @@ export function BriefTabScreen() {
                               {date ? ` · ${date}` : ""}
                             </Text>
                           </View>
+                          <Pressable
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              setItemStatus(item.id, "done");
+                            }}
+                            hitSlop={8}
+                            style={{ padding: spacing.xs }}
+                          >
+                            <Feather name="check" size={16} color={colors.textTertiary} />
+                          </Pressable>
                         </Pressable>
                       );
                     })}
@@ -588,7 +662,7 @@ export function BriefTabScreen() {
                   <Text style={{ color: colors.accentGold, fontSize: typography.sizes.md }}>Close</Text>
                 </Pressable>
               </View>
-              <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={true}>
+              <ScrollView style={{ maxHeight: 260 }} showsVerticalScrollIndicator={true}>
                 <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md, lineHeight: 24 }}>
                   {displaySlackText(selectedItem.title)}
                 </Text>
@@ -605,6 +679,45 @@ export function BriefTabScreen() {
                   </Text>
                 )}
               </ScrollView>
+
+              {(selectedItem.provider === "slack" || selectedItem.provider === "gmail") && (
+                <View style={{ flexDirection: "row", gap: spacing.xs, marginTop: spacing.sm, alignItems: "center" }}>
+                  <TextInput
+                    value={replyText}
+                    onChangeText={setReplyText}
+                    placeholder="Quick reply..."
+                    placeholderTextColor={colors.textTertiary}
+                    style={{
+                      flex: 1,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      borderRadius: 12,
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: spacing.xs,
+                      color: colors.textPrimary,
+                      fontSize: typography.sizes.sm
+                    }}
+                  />
+                  <Pressable
+                    onPress={() => {
+                      if (!replyText.trim()) return;
+                      triggerHaptic();
+                      setReplyText("");
+                      setItemStatus(selectedItem.id, "done");
+                      setSelectedItem(null);
+                    }}
+                    style={{
+                      backgroundColor: colors.accentGold,
+                      borderRadius: 10,
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: spacing.xs
+                    }}
+                  >
+                    <Feather name="send" size={14} color="#1A1A1C" />
+                  </Pressable>
+                </View>
+              )}
+
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, marginTop: spacing.md }}>
                 {selectedItemFromDone && (
                   <Pressable

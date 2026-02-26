@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Image, ImageSourcePropType, Linking, Pressable, Text, View } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import {
   integrationProviderOrder,
   integrationProviderRegistry,
@@ -206,7 +207,7 @@ export function ManageTabScreen() {
     setUserTimezone
   } = useAppState();
   const { signOut } = useAuthState();
-  const { colors, spacing, typography, radius } = useTheme();
+  const { colors, spacing, typography, radius, colorScheme, toggleColorScheme } = useTheme();
   const [activeSubTab, setActiveSubTab] = useState<ManageSubTab>("integrations");
 
   const subTabs: { key: ManageSubTab; label: string }[] = [
@@ -479,6 +480,43 @@ export function ManageTabScreen() {
 
       {activeSubTab === "settings" && (
         <>
+          <SectionBlock title="Appearance">
+            <View style={{ flexDirection: "row", gap: spacing.xs }}>
+              {(["dark", "light"] as const).map((scheme) => {
+                const isActive = colorScheme === scheme;
+                return (
+                  <Pressable
+                    key={scheme}
+                    onPress={toggleColorScheme}
+                    style={{
+                      flex: 1,
+                      borderWidth: 1,
+                      borderColor: isActive ? colors.accentGold : colors.border,
+                      borderRadius: 12,
+                      paddingVertical: spacing.sm,
+                      alignItems: "center",
+                      backgroundColor: isActive ? colors.accentGoldTint : "transparent"
+                    }}
+                  >
+                    <Feather
+                      name={scheme === "dark" ? "moon" : "sun"}
+                      size={18}
+                      color={isActive ? colors.accentGold : colors.textSecondary}
+                    />
+                    <Text
+                      style={{
+                        color: isActive ? colors.accentGold : colors.textSecondary,
+                        fontSize: typography.sizes.sm,
+                        marginTop: spacing.xxs
+                      }}
+                    >
+                      {scheme === "dark" ? "Dark" : "Light"}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </SectionBlock>
           <SectionBlock title="Timezone" rightLabel="For calendar events">
             <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.sm, marginBottom: spacing.sm }}>
               Used when creating calendar events (e.g. "Add blocker tomorrow 13-14").

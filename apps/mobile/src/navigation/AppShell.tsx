@@ -99,29 +99,27 @@ export function AppShell() {
     setAssistantActiveChat,
     startAssistantChat,
     setAssistantComposerCompact,
-    runContextPipelineNow
+    runContextPipelineNow,
+    externalItems,
+    assistantMessages
   } = useAppState();
   const { colors, spacing, typography, radius, icon } = useTheme();
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2 | 3>(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshTintColor, setRefreshTintColor] = useState("#C9A962");
-  const ACCENT_GOLD = "#C9A962";
-
-  useEffect(() => {
-    if (Platform.OS === "ios" && activeTab === "brief") {
-      setRefreshTintColor("#FFFFFF");
-      const id = setTimeout(() => setRefreshTintColor(ACCENT_GOLD), 100);
-      return () => clearTimeout(id);
-    }
-  }, [activeTab]);
+  const [syncStatus, setSyncStatus] = useState("");
 
   const onBriefRefresh = useCallback(async () => {
     setRefreshing(true);
+    setSyncStatus("Syncing integrations...");
     try {
       await runContextPipelineNow();
+      setSyncStatus("Done");
+    } catch {
+      setSyncStatus("Sync failed");
     } finally {
       setRefreshing(false);
+      setTimeout(() => setSyncStatus(""), 2000);
     }
   }, [runContextPipelineNow]);
 
@@ -216,12 +214,19 @@ export function AppShell() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onBriefRefresh}
-                tintColor={refreshTintColor}
-                colors={["#C9A962"]}
+                tintColor={colors.accentGold}
+                colors={[colors.accentGold]}
               />
             ) : undefined
           }
         >
+          {syncStatus ? (
+            <View style={{ alignItems: "center", paddingVertical: spacing.xs }}>
+              <Text style={{ color: colors.accentGold, fontSize: typography.sizes.xs }}>
+                {syncStatus}
+              </Text>
+            </View>
+          ) : null}
           <ActiveScreen />
         </ScrollView>
       )}
@@ -239,7 +244,14 @@ export function AppShell() {
         }}
         pointerEvents={tabBarHidden ? "none" : "auto"}
       >
-        <BottomTabBar activeTab={activeTab} onTabPress={(tab: RootTabKey) => setActiveTab(tab)} />
+        <BottomTabBar
+          activeTab={activeTab}
+          onTabPress={(tab: RootTabKey) => setActiveTab(tab)}
+          badges={{
+            brief: externalItems.filter((i) => i.isOutstanding).length || undefined,
+            assistant: assistantMessages.length > 0 ? undefined : undefined
+          }}
+        />
       </Animated.View>
 
       {isAssistantTab ? (

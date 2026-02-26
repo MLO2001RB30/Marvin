@@ -1,6 +1,9 @@
-import { createContext, PropsWithChildren, useContext } from "react";
+import { createContext, PropsWithChildren, useCallback, useContext, useState } from "react";
+import { Appearance } from "react-native";
 
 import { tokens } from "./tokens";
+
+type ColorScheme = "dark" | "light";
 
 interface ThemeContextValue {
   colors: typeof tokens.colors;
@@ -8,6 +11,8 @@ interface ThemeContextValue {
   typography: typeof tokens.typography;
   radius: typeof tokens.radius;
   icon: typeof tokens.icon;
+  colorScheme: ColorScheme;
+  toggleColorScheme: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
@@ -15,18 +20,31 @@ const ThemeContext = createContext<ThemeContextValue>({
   spacing: tokens.spacing,
   typography: tokens.typography,
   radius: tokens.radius,
-  icon: tokens.icon
+  icon: tokens.icon,
+  colorScheme: "dark",
+  toggleColorScheme: () => {}
 });
 
 export function ThemeProvider({ children }: PropsWithChildren) {
+  const systemScheme = Appearance.getColorScheme() ?? "dark";
+  const [colorScheme, setColorScheme] = useState<ColorScheme>(systemScheme);
+
+  const toggleColorScheme = useCallback(() => {
+    setColorScheme((prev) => (prev === "dark" ? "light" : "dark"));
+  }, []);
+
+  const colors = colorScheme === "dark" ? tokens.darkColors : tokens.lightColors;
+
   return (
     <ThemeContext.Provider
       value={{
-        colors: tokens.colors,
+        colors,
         spacing: tokens.spacing,
         typography: tokens.typography,
         radius: tokens.radius,
-        icon: tokens.icon
+        icon: tokens.icon,
+        colorScheme,
+        toggleColorScheme
       }}
     >
       {children}
