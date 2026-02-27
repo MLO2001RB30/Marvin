@@ -362,10 +362,10 @@ export function BriefTabScreen() {
               {allItems.length - doneItems.length} remaining
             </Text>
           </View>
-          <View style={{ height: 4, backgroundColor: colors.border + "40", borderRadius: 2, overflow: "hidden" }}>
+          <View style={{ height: 3, backgroundColor: colors.borderSubtle, borderRadius: 2, overflow: "hidden" }}>
             <View
               style={{
-                height: 4,
+                height: 3,
                 borderRadius: 2,
                 backgroundColor: doneItems.length === allItems.length ? colors.success : colors.accentGold,
                 width: `${allItems.length > 0 ? Math.round((doneItems.length / allItems.length) * 100) : 0}%`
@@ -380,19 +380,14 @@ export function BriefTabScreen() {
         <View
           style={{
             backgroundColor: colors.bgSurface,
-            borderRadius: 20,
+            borderRadius: 16,
             padding: spacing.xl,
             gap: spacing.md,
-            borderWidth: 1,
-            borderColor: colors.accentGold + "30",
-            borderLeftWidth: 3,
-            borderLeftColor: colors.accentGold,
-            shadowColor: colors.accentGold,
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.12,
-            shadowRadius: 20,
-            elevation: 6,
-            marginHorizontal: -4
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.08,
+            shadowRadius: 16,
+            elevation: 6
           }}
         >
           {briefNote && (
@@ -532,12 +527,15 @@ export function BriefTabScreen() {
                 flexDirection: "row",
                 alignItems: "center",
                 gap: spacing.sm,
-                backgroundColor: colors.accentGoldTint,
-                borderRadius: 14,
+                backgroundColor: colors.bgSurface,
+                borderRadius: 12,
                 paddingHorizontal: spacing.md,
                 paddingVertical: spacing.sm,
-                borderWidth: 0,
-                borderLeftWidth: 0,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 3,
+                elevation: 1,
                 opacity: pressed ? 0.7 : 1,
                 transform: [{ scale: pressed ? 0.98 : 1 }]
               })}
@@ -567,12 +565,15 @@ export function BriefTabScreen() {
 
       <View
         style={{
-          backgroundColor: colors.bgSurfaceAlt,
-          borderRadius: 20,
+          backgroundColor: colors.bgSurface,
+          borderRadius: 16,
           padding: spacing.lg,
           gap: spacing.md,
-          borderWidth: 1,
-          borderColor: colors.border,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          elevation: 3,
           ...(hasOpenItems && { maxHeight: openItemsCardHeight })
         }}
       >
@@ -584,15 +585,15 @@ export function BriefTabScreen() {
             <Pressable
               onPress={() => setReviewModalOpen(true)}
               style={({ pressed }) => ({
-                borderWidth: 1,
-                borderColor: colors.accentGold,
                 borderRadius: 999,
                 paddingHorizontal: spacing.md,
                 paddingVertical: spacing.xs,
-                backgroundColor: pressed ? colors.accentGoldTint : "transparent"
+                backgroundColor: colors.accentGold,
+                opacity: pressed ? 0.85 : 1,
+                transform: [{ scale: pressed ? 0.97 : 1 }]
               })}
             >
-              <Text style={{ color: colors.accentGold, fontSize: typography.sizes.sm }}>
+              <Text style={{ color: "#FFFFFF", fontSize: typography.sizes.xs, fontWeight: "600" }}>
                 Review
               </Text>
             </Pressable>
@@ -670,10 +671,13 @@ export function BriefTabScreen() {
               const stackHeight = stackHeightFor(items.length);
               return (
                 <View key={urgency} style={{ gap: spacing.xs }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs, backgroundColor: urgencyColor + "0A", borderRadius: 8, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, marginTop: cohortIdx > 0 ? spacing.md : 0 }}>
-                    <Feather name={urgencyIcon} size={16} color={urgencyColor} />
-                    <Text style={{ color: urgencyColor, fontSize: typography.sizes.md, fontWeight: "700" }}>
-                      {label} ({totalCount})
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingVertical: spacing.xs, marginTop: cohortIdx > 0 ? spacing.lg : 0 }}>
+                    <Feather name={urgencyIcon} size={14} color={urgencyColor} />
+                    <Text style={{ color: urgencyColor, fontSize: typography.sizes.sm, fontWeight: "600", letterSpacing: 0.3 }}>
+                      {label}
+                    </Text>
+                    <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.xs }}>
+                      {totalCount}
                     </Text>
                   </View>
                   <View style={{ gap: spacing.xs }}>
@@ -697,20 +701,13 @@ export function BriefTabScreen() {
                             style={({ pressed }) => ({
                               flexDirection: "row",
                               alignItems: "center",
-                              borderWidth: 1,
-                              borderColor: colors.border,
                               borderLeftWidth: 3,
                               borderLeftColor: urgencyColor,
-                              borderRadius: 14,
+                              borderRadius: 12,
                               paddingVertical: spacing.sm,
                               paddingHorizontal: spacing.md,
-                              backgroundColor: colors.bgSurface,
+                              backgroundColor: colors.bgSurfaceAlt,
                               gap: spacing.sm,
-                              shadowColor: "#000",
-                              shadowOffset: { width: 0, height: 2 },
-                              shadowOpacity: 0.06,
-                              shadowRadius: 8,
-                              elevation: 2,
                               opacity: pressed ? 0.7 : 1,
                               transform: [{ scale: pressed ? 0.98 : 1 }]
                             })}
@@ -769,14 +766,11 @@ export function BriefTabScreen() {
                           alignSelf: "center",
                           paddingVertical: spacing.xs,
                           paddingHorizontal: spacing.md,
-                          borderWidth: 1,
-                          borderColor: colors.accentGold + "50",
                           borderRadius: 999,
-                          opacity: pressed ? 0.6 : 1,
-                          backgroundColor: pressed ? colors.accentGoldTint : "transparent"
+                          opacity: pressed ? 0.5 : 0.8
                         })}
                       >
-                        <Text style={{ color: colors.accentGold, fontSize: typography.sizes.sm, fontWeight: "500" }}>
+                        <Text style={{ color: colors.accentGold, fontSize: typography.sizes.xs }}>
                           Show all {totalCount} →
                         </Text>
                       </Pressable>

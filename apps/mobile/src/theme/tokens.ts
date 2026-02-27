@@ -1,31 +1,43 @@
 const darkColors = {
-  bgPage: "#1A1A1C",
-  bgSurface: "#242426",
-  bgSurfaceAlt: "#1F1F21",
-  border: "#3A3A3C",
-  accentGold: "#C9A962",
-  accentGoldTint: "#C9A96240",
-  textPrimary: "#FFFFFF",
-  textSecondary: "#9A9A9C",
-  textTertiary: "#6E6E70",
-  success: "#4ADE80",
+  bgPage: "#111113",
+  bgSurface: "#1C1C1E",
+  bgSurfaceAlt: "#161618",
+  bgElevated: "#252528",
+  border: "#2C2C2E",
+  borderSubtle: "#232325",
+  accentGold: "#D4AF5A",
+  accentGoldTint: "rgba(212,175,90,0.12)",
+  accentGoldMuted: "rgba(212,175,90,0.06)",
+  textPrimary: "#F5F5F7",
+  textSecondary: "#8E8E93",
+  textTertiary: "#636366",
+  success: "#34D399",
+  successTint: "rgba(52,211,153,0.1)",
   info: "#60A5FA",
-  danger: "#F87171"
+  infoTint: "rgba(96,165,250,0.1)",
+  danger: "#FB7185",
+  dangerTint: "rgba(251,113,133,0.1)"
 };
 
 const lightColors: typeof darkColors = {
-  bgPage: "#F5F5F7",
+  bgPage: "#F8F8FA",
   bgSurface: "#FFFFFF",
-  bgSurfaceAlt: "#FAFAFA",
-  border: "#E0E0E2",
-  accentGold: "#9E7C2E",
-  accentGoldTint: "#9E7C2E18",
-  textPrimary: "#1A1A1C",
-  textSecondary: "#6E6E70",
-  textTertiary: "#9A9A9C",
-  success: "#16A34A",
+  bgSurfaceAlt: "#F3F3F5",
+  bgElevated: "#FFFFFF",
+  border: "#E8E8EC",
+  borderSubtle: "#F0F0F2",
+  accentGold: "#B8913A",
+  accentGoldTint: "rgba(184,145,58,0.10)",
+  accentGoldMuted: "rgba(184,145,58,0.04)",
+  textPrimary: "#1A1A1E",
+  textSecondary: "#6B6B73",
+  textTertiary: "#A0A0A8",
+  success: "#059669",
+  successTint: "rgba(5,150,105,0.08)",
   info: "#2563EB",
-  danger: "#DC2626"
+  infoTint: "rgba(37,99,235,0.08)",
+  danger: "#E11D48",
+  dangerTint: "rgba(225,29,72,0.08)"
 };
 
 const providerColors = {
@@ -49,10 +61,10 @@ export const tokens = {
     serif: "Georgia",
     sans: "System",
     sizes: {
-      xs: 10,
-      sm: 12,
-      md: 14,
-      lg: 16,
+      xs: 11,
+      sm: 13,
+      md: 15,
+      lg: 17,
       xl: 22,
       xxl: 32,
       hero: 40
@@ -80,9 +92,34 @@ export const tokens = {
     section: 40
   },
   radius: {
-    none: 0,
-    card: 20,
-    pill: 34
+    sm: 8,
+    md: 12,
+    card: 16,
+    lg: 20,
+    pill: 999
+  },
+  shadow: {
+    sm: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.04,
+      shadowRadius: 3,
+      elevation: 1
+    },
+    md: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 3
+    },
+    lg: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 16,
+      elevation: 6
+    }
   },
   icon: {
     sm: 14,

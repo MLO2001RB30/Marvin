@@ -57,7 +57,7 @@ export function AppHeader({
               }}
             />
           ) : null}
-          <Text style={{ color: colors.textTertiary, fontSize: typography.sizes.sm }} numberOfLines={1}>
+          <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.xs, letterSpacing: 0.2 }} numberOfLines={1}>
             {subtitle}
           </Text>
         </View>
@@ -66,9 +66,8 @@ export function AppHeader({
         style={{
           color: colors.textPrimary,
           fontSize: titleSize,
-          fontWeight: compact ? "600" : "400",
-          letterSpacing: compact ? -0.3 : -0.5,
-          fontFamily: compact ? "Georgia" : undefined
+          fontWeight: compact ? "700" : "400",
+          letterSpacing: compact ? -0.4 : -0.5
         }}
       >
         {title}
