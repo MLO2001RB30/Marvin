@@ -17,18 +17,17 @@ export function BottomTabBar({
   return (
     <View
       style={{
-        borderWidth: 1,
-        borderColor: colors.border,
         borderRadius: radius.pill,
-        backgroundColor: colors.bgSurface,
-        padding: spacing.xs,
+        backgroundColor: colors.bgElevated,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.md,
         flexDirection: "row",
         justifyContent: "space-around",
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        elevation: 8
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 12
       }}
     >
       {rootTabs.map((tab) => {

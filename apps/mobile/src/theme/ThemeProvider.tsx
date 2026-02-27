@@ -11,6 +11,7 @@ interface ThemeContextValue {
   spacing: typeof tokens.spacing;
   typography: typeof tokens.typography;
   radius: typeof tokens.radius;
+  shadow: typeof tokens.shadow;
   icon: typeof tokens.icon;
   colorScheme: ColorScheme;
   toggleColorScheme: () => void;
@@ -22,6 +23,7 @@ const ThemeContext = createContext<ThemeContextValue>({
   spacing: tokens.spacing,
   typography: tokens.typography,
   radius: tokens.radius,
+  shadow: tokens.shadow,
   icon: tokens.icon,
   colorScheme: "dark",
   toggleColorScheme: () => {}
@@ -45,6 +47,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
         spacing: tokens.spacing,
         typography: tokens.typography,
         radius: tokens.radius,
+        shadow: tokens.shadow,
         icon: tokens.icon,
         colorScheme,
         toggleColorScheme
