@@ -1,43 +1,43 @@
 const darkColors = {
-  bgPage: "#111113",
-  bgSurface: "#1C1C1E",
-  bgSurfaceAlt: "#161618",
-  bgElevated: "#252528",
-  border: "#2C2C2E",
-  borderSubtle: "#232325",
-  accentGold: "#D4AF5A",
-  accentGoldTint: "rgba(212,175,90,0.12)",
-  accentGoldMuted: "rgba(212,175,90,0.06)",
-  textPrimary: "#F5F5F7",
-  textSecondary: "#8E8E93",
-  textTertiary: "#636366",
-  success: "#34D399",
-  successTint: "rgba(52,211,153,0.1)",
-  info: "#60A5FA",
-  infoTint: "rgba(96,165,250,0.1)",
-  danger: "#FB7185",
-  dangerTint: "rgba(251,113,133,0.1)"
+  bgPage: "#191919",
+  bgSurface: "#202020",
+  bgSurfaceAlt: "#252525",
+  bgElevated: "#2C2C2C",
+  border: "rgba(255,255,255,0.06)",
+  borderSubtle: "rgba(255,255,255,0.03)",
+  accentGold: "#FFA344",
+  accentGoldTint: "rgba(255,163,68,0.12)",
+  accentGoldMuted: "rgba(255,163,68,0.06)",
+  textPrimary: "#EBEBEB",
+  textSecondary: "#9B9A97",
+  textTertiary: "#5A5A5A",
+  success: "#4DAB9A",
+  successTint: "rgba(77,171,154,0.12)",
+  info: "#529CCA",
+  infoTint: "rgba(82,156,202,0.12)",
+  danger: "#FF7369",
+  dangerTint: "rgba(255,115,105,0.12)"
 };
 
 const lightColors: typeof darkColors = {
-  bgPage: "#F8F8FA",
+  bgPage: "#FFFFFF",
   bgSurface: "#FFFFFF",
-  bgSurfaceAlt: "#F3F3F5",
+  bgSurfaceAlt: "#F7F6F3",
   bgElevated: "#FFFFFF",
-  border: "#E8E8EC",
-  borderSubtle: "#F0F0F2",
-  accentGold: "#B8913A",
-  accentGoldTint: "rgba(184,145,58,0.10)",
-  accentGoldMuted: "rgba(184,145,58,0.04)",
-  textPrimary: "#1A1A1E",
-  textSecondary: "#6B6B73",
-  textTertiary: "#A0A0A8",
-  success: "#059669",
-  successTint: "rgba(5,150,105,0.08)",
+  border: "rgba(0,0,0,0.06)",
+  borderSubtle: "rgba(0,0,0,0.03)",
+  accentGold: "#D97706",
+  accentGoldTint: "rgba(217,119,6,0.08)",
+  accentGoldMuted: "rgba(217,119,6,0.04)",
+  textPrimary: "#37352F",
+  textSecondary: "#787774",
+  textTertiary: "#B4B4B0",
+  success: "#0F7B6C",
+  successTint: "rgba(15,123,108,0.08)",
   info: "#2563EB",
   infoTint: "rgba(37,99,235,0.08)",
-  danger: "#E11D48",
-  dangerTint: "rgba(225,29,72,0.08)"
+  danger: "#E03E3E",
+  dangerTint: "rgba(224,62,62,0.08)"
 };
 
 const providerColors = {
@@ -59,13 +59,13 @@ export const tokens = {
   providerColors,
   typography: {
     serif: "Georgia",
-    sans: "System",
+    sans: "Inter, -apple-system, system-ui, sans-serif",
     sizes: {
       xs: 11,
       sm: 13,
       md: 15,
       lg: 17,
-      xl: 22,
+      xl: 24,
       xxl: 32,
       hero: 40
     },
@@ -76,7 +76,7 @@ export const tokens = {
       bold: "700" as const
     },
     letterSpacing: {
-      tight: -0.5,
+      tight: -0.3,
       normal: 0,
       wide: 0.5
     }
@@ -89,42 +89,24 @@ export const tokens = {
     card: 20,
     lg: 24,
     xl: 32,
-    section: 40
+    section: 48
   },
   radius: {
-    sm: 8,
-    md: 12,
-    card: 16,
-    lg: 20,
+    sm: 4,
+    md: 8,
+    card: 12,
+    lg: 16,
     pill: 999
   },
   shadow: {
-    sm: {
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.04,
-      shadowRadius: 3,
-      elevation: 1
-    },
-    md: {
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.06,
-      shadowRadius: 8,
-      elevation: 3
-    },
-    lg: {
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.08,
-      shadowRadius: 16,
-      elevation: 6
-    }
+    sm: {},
+    md: {},
+    lg: {}
   },
   icon: {
-    sm: 14,
-    md: 18,
-    lg: 22
+    sm: 16,
+    md: 20,
+    lg: 24
   }
 };
 
