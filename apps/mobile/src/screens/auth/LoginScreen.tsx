@@ -44,10 +44,11 @@ export function LoginScreen() {
             style={{
               borderWidth: 1,
               borderColor: colors.border,
-              borderRadius: 12,
+              borderRadius: 8,
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
-              color: colors.textPrimary
+              color: colors.textPrimary,
+              backgroundColor: colors.bgSurfaceAlt
             }}
           />
           <TextInput
@@ -59,24 +60,24 @@ export function LoginScreen() {
             style={{
               borderWidth: 1,
               borderColor: colors.border,
-              borderRadius: 12,
+              borderRadius: 8,
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
-              color: colors.textPrimary
+              color: colors.textPrimary,
+              backgroundColor: colors.bgSurfaceAlt
             }}
           />
           <Pressable
             onPress={() => signIn(email.trim(), password)}
             style={({ pressed }) => ({
-              borderRadius: radius.pill,
+              borderRadius: 8,
               paddingVertical: spacing.md,
               alignItems: "center",
               backgroundColor: colors.accentGold,
-              opacity: pressed ? 0.85 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }]
+              opacity: pressed ? 0.85 : 1
             })}
           >
-            <Text style={{ color: "#1A1A1C", fontSize: typography.sizes.md, fontWeight: "600" }}>Log in</Text>
+            <Text style={{ color: "#191919", fontSize: typography.sizes.md, fontWeight: "600" }}>Log in</Text>
           </Pressable>
           <Pressable
             onPress={() => {

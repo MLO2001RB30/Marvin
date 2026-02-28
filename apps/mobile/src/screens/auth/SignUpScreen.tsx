@@ -30,12 +30,10 @@ export function SignUpScreen() {
           </View>
           <View
             style={{
-              borderWidth: 1,
-              borderColor: colors.accentGold,
-              borderRadius: radius.card,
+              borderRadius: 8,
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
-              backgroundColor: colors.accentGoldTint,
+              backgroundColor: colors.bgSurfaceAlt,
               gap: spacing.xs
             }}
           >
@@ -72,10 +70,11 @@ export function SignUpScreen() {
             style={{
               borderWidth: 1,
               borderColor: colors.border,
-              borderRadius: 12,
+              borderRadius: 8,
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
-              color: colors.textPrimary
+              color: colors.textPrimary,
+              backgroundColor: colors.bgSurfaceAlt
             }}
           />
           <TextInput
@@ -88,10 +87,11 @@ export function SignUpScreen() {
             style={{
               borderWidth: 1,
               borderColor: colors.border,
-              borderRadius: 12,
+              borderRadius: 8,
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
-              color: colors.textPrimary
+              color: colors.textPrimary,
+              backgroundColor: colors.bgSurfaceAlt
             }}
           />
           <TextInput
@@ -103,10 +103,11 @@ export function SignUpScreen() {
             style={{
               borderWidth: 1,
               borderColor: colors.border,
-              borderRadius: 12,
+              borderRadius: 8,
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
-              color: colors.textPrimary
+              color: colors.textPrimary,
+              backgroundColor: colors.bgSurfaceAlt
             }}
           />
           <TextInput
@@ -118,10 +119,11 @@ export function SignUpScreen() {
             style={{
               borderWidth: 1,
               borderColor: colors.border,
-              borderRadius: 12,
+              borderRadius: 8,
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
-              color: colors.textPrimary
+              color: colors.textPrimary,
+              backgroundColor: colors.bgSurfaceAlt
             }}
           />
           <Pressable
@@ -132,15 +134,14 @@ export function SignUpScreen() {
               void signUp(email.trim(), password, firstName.trim());
             }}
             style={({ pressed }) => ({
-              borderRadius: radius.pill,
+              borderRadius: 8,
               paddingVertical: spacing.md,
               alignItems: "center",
               backgroundColor: colors.accentGold,
-              opacity: pressed ? 0.85 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }]
+              opacity: pressed ? 0.85 : 1
             })}
           >
-            <Text style={{ color: "#1A1A1C", fontSize: typography.sizes.md, fontWeight: "600" }}>
+            <Text style={{ color: "#191919", fontSize: typography.sizes.md, fontWeight: "600" }}>
               Create account
             </Text>
           </Pressable>

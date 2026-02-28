@@ -379,19 +379,14 @@ export function BriefTabScreen() {
       {(briefPriorities.length > 0 || briefNote) && (
         <View
           style={{
-            backgroundColor: colors.bgSurface,
-            borderRadius: 16,
-            padding: spacing.xl,
-            gap: spacing.md,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.08,
-            shadowRadius: 16,
-            elevation: 6
+            backgroundColor: colors.bgSurfaceAlt,
+            borderRadius: 12,
+            padding: spacing.lg,
+            gap: spacing.md
           }}
         >
           {briefNote && (
-            <View style={{ flexDirection: "row", gap: spacing.sm, backgroundColor: colors.accentGoldTint, borderRadius: 12, padding: spacing.sm, alignItems: "flex-start" }}>
+            <View style={{ flexDirection: "row", gap: spacing.sm, backgroundColor: colors.accentGoldMuted, borderRadius: 8, padding: spacing.sm, alignItems: "flex-start" }}>
               <Feather name="zap" size={14} color={colors.accentGold} style={{ marginTop: 2 }} />
               <Text style={{ color: colors.textPrimary, fontSize: typography.sizes.md, lineHeight: typography.sizes.md * 1.6, flex: 1 }}>
                 {briefNote}
@@ -527,17 +522,11 @@ export function BriefTabScreen() {
                 flexDirection: "row",
                 alignItems: "center",
                 gap: spacing.sm,
-                backgroundColor: colors.bgSurface,
-                borderRadius: 12,
+                backgroundColor: colors.bgSurfaceAlt,
+                borderRadius: 8,
                 paddingHorizontal: spacing.md,
                 paddingVertical: spacing.sm,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.04,
-                shadowRadius: 3,
-                elevation: 1,
-                opacity: pressed ? 0.7 : 1,
-                transform: [{ scale: pressed ? 0.98 : 1 }]
+                opacity: pressed ? 0.7 : 1
               })}
             >
               <Feather
@@ -565,15 +554,10 @@ export function BriefTabScreen() {
 
       <View
         style={{
-          backgroundColor: colors.bgSurface,
-          borderRadius: 16,
+          backgroundColor: colors.bgSurfaceAlt,
+          borderRadius: 12,
           padding: spacing.lg,
           gap: spacing.md,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 10,
-          elevation: 3,
           ...(hasOpenItems && { maxHeight: openItemsCardHeight })
         }}
       >
@@ -585,16 +569,15 @@ export function BriefTabScreen() {
             <Pressable
               onPress={() => setReviewModalOpen(true)}
               style={({ pressed }) => ({
-                borderRadius: 999,
+                borderRadius: 8,
                 paddingHorizontal: spacing.md,
                 paddingVertical: spacing.xs,
-                backgroundColor: colors.accentGold,
-                opacity: pressed ? 0.85 : 1,
-                transform: [{ scale: pressed ? 0.97 : 1 }]
+                backgroundColor: colors.accentGoldTint,
+                opacity: pressed ? 0.7 : 1
               })}
             >
-              <Text style={{ color: "#FFFFFF", fontSize: typography.sizes.xs, fontWeight: "600" }}>
-                Review
+              <Text style={{ color: colors.accentGold, fontSize: typography.sizes.xs, fontWeight: "500" }}>
+                Review all
               </Text>
             </Pressable>
           )}
@@ -701,15 +684,12 @@ export function BriefTabScreen() {
                             style={({ pressed }) => ({
                               flexDirection: "row",
                               alignItems: "center",
-                              borderLeftWidth: 3,
-                              borderLeftColor: urgencyColor,
-                              borderRadius: 12,
+                              borderRadius: 8,
                               paddingVertical: spacing.sm,
                               paddingHorizontal: spacing.md,
-                              backgroundColor: colors.bgSurfaceAlt,
+                              backgroundColor: pressed ? colors.bgElevated : "transparent",
                               gap: spacing.sm,
-                              opacity: pressed ? 0.7 : 1,
-                              transform: [{ scale: pressed ? 0.98 : 1 }]
+                              opacity: pressed ? 0.8 : 1
                             })}
                           >
                             {logoSource ? (
@@ -901,7 +881,7 @@ export function BriefTabScreen() {
         <Pressable
           style={{
             flex: 1,
-            backgroundColor: "rgba(0,0,0,0.55)",
+            backgroundColor: "rgba(0,0,0,0.7)",
             justifyContent: "flex-end"
           }}
           onPress={() => {
@@ -913,20 +893,12 @@ export function BriefTabScreen() {
           {selectedItem && (
             <Pressable
               style={{
-                backgroundColor: colors.bgSurface,
-                borderTopLeftRadius: 24,
-                borderTopRightRadius: 24,
+                backgroundColor: colors.bgElevated,
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16,
                 padding: spacing.lg,
                 paddingBottom: spacing.xl,
-                borderWidth: 1,
-                borderBottomWidth: 0,
-                borderColor: colors.border,
-                maxHeight: "80%",
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: -4 },
-                shadowOpacity: 0.15,
-                shadowRadius: 20,
-                elevation: 10
+                maxHeight: "80%"
               }}
               onPress={(e) => e.stopPropagation()}
             >
